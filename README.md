@@ -22,6 +22,26 @@ This animation shows the Gardner timing recovery algorithm in `csdr` locking on 
 
 (The symbol is sampled at the left red dot. The algorithm moves the middle dot as close to the symbol transition center, as possible.)
 
+How to compile with MinGW and Code::Blocks
+-------------------------
+
+* Use WSL(2)
+* Download and unpack http://www.fftw.org/fftw-3.3.8.tar.gz
+```cd $FFTW_SRC && mkdir build && cd build
+export CROSS=x86_64-w64-mingw32
+export PREFIX=/mingw
+../configure --host=$CROSS \
+--prefix=$PREFIX --disable-maintainer-mode --enable-shared --disable-static \
+--enable-threads --with-combined-threads --disable-doc --enable-float \
+--enable-sse --enable-sse2 --enable-avx --enable-avx2 --disable-fortran \
+--with-our-malloc
+make && make install-strip
+```
+* Copy `fftw3.h` and `libfftw3f.dll.a` to `mingw/include` and `mingw/lib` directories
+* Open `mingw/csdr.cbp` in C::B
+* Build target "libcsdr", then "csdr".
+* Copy `libfftw3f-3.dll` to `mingw/bin`
+
 How to compile
 --------------
 

@@ -1,26 +1,24 @@
-#include <math.h>
 #include "libcsdr.h"
 #include "libcsdr_gpl.h"
 
-typedef struct fastddc_s
-{
-	int pre_decimation;
-	int post_decimation;
-	int taps_length; 
-	int taps_min_length;
-	int overlap_length; //it is taps_length - 1
-	int fft_size;
-	int fft_inv_size;
-	int input_size;
-	int post_input_size;
-	float pre_shift;
-	int startbin; //for pre_shift
-	int v; //step for pre_shift
-	int offsetbin;
-	float post_shift;
-	int output_scrape;
-	int scrap;
-	shift_addition_data_t dsadata;
+typedef struct fastddc_s {
+    int pre_decimation;
+    int post_decimation;
+    int taps_length;
+    int taps_min_length;
+    int overlap_length; //it is taps_length - 1
+    int fft_size;
+    int fft_inv_size;
+    int input_size;
+    int post_input_size;
+    float pre_shift;
+    int startbin; //for pre_shift
+    int v; //step for pre_shift
+    int offsetbin;
+    float post_shift;
+    int output_scrape;
+    int scrap;
+    shift_addition_data_t dsadata;
 } fastddc_t;
 
 int fastddc_init(fastddc_t* ddc, float transition_bw, int decimation, float shift_rate);

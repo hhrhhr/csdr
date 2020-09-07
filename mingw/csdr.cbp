@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6" />
+	<Project>
+		<Option title="csdr" />
+		<Option platforms="Windows;" />
+		<Option pch_mode="2" />
+		<Option compiler="mingw-w64_gcc_93_x64" />
+		<Build>
+			<Target title="libcsdr">
+				<Option output="bin/csdr-$(DLLVERSION).dll" prefix_auto="0" extension_auto="0" />
+				<Option working_dir="bin/" />
+				<Option object_output="obj/" />
+				<Option type="3" />
+				<Option compiler="mingw-w64_gcc_93_x64" />
+			</Target>
+			<Target title="csdr">
+				<Option output="bin/csdr.exe" prefix_auto="0" extension_auto="0" />
+				<Option working_dir="bin/" />
+				<Option object_output="obj/" />
+				<Option type="1" />
+				<Option compiler="mingw-w64_gcc_93_x64" />
+				<Compiler>
+					<Add option="-DCLOCK_MONOTONIC_RAW=CLOCK_MONOTONIC" />
+				</Compiler>
+				<Linker>
+					<Add library="bin/csdr-$(DLLVERSION).dll" />
+					<Add library="ws2_32" />
+				</Linker>
+			</Target>
+			<Environment>
+				<Variable name="DLLVERSION" value="0.15-git" />
+			</Environment>
+		</Build>
+		<Compiler>
+			<Add option="-flto" />
+			<Add option="-O3" />
+			<Add option="-Wextra" />
+			<Add option="-Wall" />
+			<Add option="-fPIC" />
+			<Add option="-std=gnu99" />
+			<Add option="-ffast-math" />
+			<Add option="-msse" />
+			<Add option="-msse2" />
+			<Add option="-msse3" />
+			<Add option="-msse4" />
+			<Add option="-msse4.1" />
+			<Add option="-msse4.2" />
+			<Add option="-mfpmath=sse" />
+			<Add option="-trigraphs" />
+			<Add option="-DUSE_FFTW" />
+			<Add option="-DLIBCSDR_GPL" />
+			<Add option="-DUSE_IMA_ADPCM" />
+			<Add option="-D__MINGW32__" />
+			<Add directory="include" />
+		</Compiler>
+		<Linker>
+			<Add option="-O3" />
+			<Add option="-flto" />
+			<Add option="-s" />
+			<Add library="fftw3f" />
+			<Add directory="lib" />
+		</Linker>
+		<Unit filename="../csdr.c">
+			<Option compilerVar="CC" />
+			<Option target="csdr" />
+		</Unit>
+		<Unit filename="../fastddc.c">
+			<Option compilerVar="CC" />
+			<Option target="libcsdr" />
+		</Unit>
+		<Unit filename="../fastddc.h">
+			<Option target="libcsdr" />
+		</Unit>
+		<Unit filename="../fft_fftw.c">
+			<Option compilerVar="CC" />
+			<Option target="libcsdr" />
+		</Unit>
+		<Unit filename="../fft_fftw.h">
+			<Option target="libcsdr" />
+		</Unit>
+		<Unit filename="../ima_adpcm.c">
+			<Option compilerVar="CC" />
+			<Option target="csdr" />
+		</Unit>
+		<Unit filename="../ima_adpcm.h" />
+		<Unit filename="../libcsdr.c">
+			<Option compilerVar="CC" />
+			<Option target="libcsdr" />
+		</Unit>
+		<Unit filename="../libcsdr.h">
+			<Option target="libcsdr" />
+		</Unit>
+		<Unit filename="../libcsdr_gpl.c">
+			<Option compilerVar="CC" />
+			<Option target="libcsdr" />
+		</Unit>
+		<Unit filename="../libcsdr_gpl.h">
+			<Option target="libcsdr" />
+		</Unit>
+		<Unit filename="../predefined.h">
+			<Option target="libcsdr" />
+		</Unit>
+		<Extensions>
+			<editor_config active="1" use_tabs="1" tab_indents="1" tab_width="4" indent="4" eol_mode="3" />
+			<lib_finder disable_auto="1" />
+		</Extensions>
+	</Project>
+</CodeBlocks_project_file>

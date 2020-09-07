@@ -28,6 +28,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+#ifndef __MINGW32__
 #include <stdio.h>
 #include <time.h>
 #include <math.h>
@@ -39,6 +40,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "predefined.h"
 #include <assert.h>
 #include <stdarg.h>
+#else
+#include "libcsdr.h"
+#include "predefined.h"
+#endif
 
 /*
            _           _                   __                  _   _
@@ -91,7 +96,9 @@ float firdes_wkernel_hamming(float rate)
 
 
 float firdes_wkernel_boxcar(float rate)
-{   //"Dummy" window kernel, do not use; an unwindowed FIR filter may have bad frequency response
+{
+    //"Dummy" window kernel, do not use; an unwindowed FIR filter may have bad frequency response
+    (void)rate;
     return 1.0;
 }
 
@@ -118,23 +125,23 @@ void normalize_fir_f(float* input, float* output, int length)
 {
     //Normalize filter kernel
     float sum=0;
-    for(int i=0;i<length;i++) //@normalize_fir_f: normalize pass 1
+    for(int i=0; i<length; i++) //@normalize_fir_f: normalize pass 1
         sum+=input[i];
-    for(int i=0;i<length;i++) //@normalize_fir_f: normalize pass 2
+    for(int i=0; i<length; i++) //@normalize_fir_f: normalize pass 2
         output[i]=input[i]/sum;
 }
 
 void firdes_lowpass_f(float *output, int length, float cutoff_rate, window_t window)
-{   //Generates symmetric windowed sinc FIR filter real taps
+{
+    //Generates symmetric windowed sinc FIR filter real taps
     //  length should be odd
     //  cutoff_rate is (cutoff frequency/sampling frequency)
     //Explanation at Chapter 16 of dspguide.com
     int middle=length/2;
-    float temp;
+    //float temp;
     float (*window_function)(float)  = firdes_get_window_kernel(window);
     output[middle]=2*PI*cutoff_rate*window_function(0);
-    for(int i=1; i<=middle; i++) //@@firdes_lowpass_f: calculate taps
-    {
+    for(int i=1; i<=middle; i++) { //@@firdes_lowpass_f: calculate taps
         output[middle-i]=output[middle+i]=(sin(2*PI*cutoff_rate*i)/i)*window_function((float)i/middle);
         //printf("%g %d %d %d %d | %g\n",output[middle-i],i,middle,middle+i,middle-i,sin(2*PI*cutoff_rate*i));
     }
@@ -153,8 +160,7 @@ void firdes_bandpass_c(complexf *output, int length, float lowcut, float highcut
     float filter_center=(highcut+lowcut)/2;
 
     float phase=0, sinval, cosval;
-    for(int i=0; i<length; i++) //@@firdes_bandpass_c
-    {
+    for(int i=0; i<length; i++) { //@@firdes_bandpass_c
         cosval=cos(phase);
         sinval=sin(phase);
         phase+=2*PI*filter_center;
@@ -190,8 +196,7 @@ float shift_math_cc(complexf *input, complexf* output, int input_size, float rat
     float phase=starting_phase;
     float phase_increment=rate*PI;
     float cosval, sinval;
-    for(int i=0;i<input_size; i++) //@shift_math_cc
-    {
+    for(int i=0; i<input_size; i++) { //@shift_math_cc
         cosval=cos(phase);
         sinval=sin(phase);
         //we multiply two complex numbers.
@@ -214,8 +219,7 @@ shift_table_data_t shift_table_init(int table_size)
     shift_table_data_t output;
     output.table=(float*)malloc(sizeof(float)*table_size);
     output.table_size=table_size;
-    for(int i=0;i<table_size;i++)
-    {
+    for(int i=0; i<table_size; i++) {
         output.table[i]=sin(((float)i/table_size)*(PI/2));
     }
     return output;
@@ -234,16 +238,14 @@ float shift_table_cc(complexf* input, complexf* output, int input_size, float ra
     float phase=starting_phase;
     float phase_increment=rate*PI;
     float cosval, sinval;
-    for(int i=0;i<input_size; i++) //@shift_math_cc
-    {
+    for(int i=0; i<input_size; i++) { //@shift_math_cc
         int sin_index, cos_index, temp_index, sin_sign, cos_sign;
         //float vphase=fmodf(phase,PI/2); //between 0 and 90deg
         int quadrant=phase/(PI/2); //between 0 and 3
         float vphase=phase-quadrant*(PI/2);
         sin_index=(vphase/(PI/2))*table_data.table_size;
         cos_index=table_data.table_size-1-sin_index;
-        if(quadrant&1) //in quadrant 1 and 3
-        {
+        if(quadrant&1) { //in quadrant 1 and 3
             temp_index=sin_index;
             sin_index=cos_index;
             cos_index=temp_index;
@@ -273,8 +275,7 @@ shift_unroll_data_t shift_unroll_init(float rate, int size)
     output.dsin=(float*)malloc(sizeof(float)*size);
     output.dcos=(float*)malloc(sizeof(float)*size);
     float myphase = 0;
-    for(int i=0;i<size;i++)
-    {
+    for(int i=0; i<size; i++) {
         myphase += output.phase_increment;
         while(myphase>PI) myphase-=2*PI;
         while(myphase<-PI) myphase+=2*PI;
@@ -291,8 +292,7 @@ float shift_unroll_cc(complexf *input, complexf* output, int input_size, shift_u
     float cos_start=cos(starting_phase);
     float sin_start=sin(starting_phase);
     register float cos_val, sin_val;
-    for(int i=0;i<input_size; i++) //@shift_unroll_cc
-    {
+    for(int i=0; i<input_size; i++) { //@shift_unroll_cc
         cos_val = cos_start * d->dcos[i] - sin_start * d->dsin[i];
         sin_val  = sin_start * d->dcos[i] + cos_start * d->dsin[i];
         iof(output,i)=cos_val*iof(input,i)-sin_val*qof(input,i);
@@ -308,8 +308,7 @@ shift_addfast_data_t shift_addfast_init(float rate)
 {
     shift_addfast_data_t output;
     output.phase_increment=2*rate*PI;
-    for(int i=0;i<4;i++)
-    {
+    for(int i=0; i<4; i++) {
         output.dsin[i]=sin(output.phase_increment*(i+1));
         output.dcos[i]=cos(output.phase_increment*(i+1));
     }
@@ -324,8 +323,7 @@ float shift_addfast_cc(complexf *input, complexf* output, int input_size, shift_
     //input_size should be multiple of 4
     float cos_start[4], sin_start[4];
     float cos_vals[4], sin_vals[4];
-    for(int i=0;i<4;i++)
-    {
+    for(int i=0; i<4; i++) {
         cos_start[i] = cos(starting_phase);
         sin_start[i] = sin(starting_phase);
     }
@@ -337,17 +335,17 @@ float shift_addfast_cc(complexf *input, complexf* output, int input_size, shift_
     register float* poutput = (float*)output;
 
     //Register map:
-    #define RDCOS "q0" //dcos, dsin
-    #define RDSIN "q1"
-    #define RCOSST "q2" //cos_start, sin_start
-    #define RSINST "q3"
-    #define RCOSV "q4" //cos_vals, sin_vals
-    #define RSINV "q5"
-    #define ROUTI "q6" //output_i, output_q
-    #define ROUTQ "q7"
-    #define RINPI "q8" //input_i, input_q
-    #define RINPQ "q9"
-    #define R3(x,y,z) x ", " y ", " z "\n\t"
+#define RDCOS "q0" //dcos, dsin
+#define RDSIN "q1"
+#define RCOSST "q2" //cos_start, sin_start
+#define RSINST "q3"
+#define RCOSV "q4" //cos_vals, sin_vals
+#define RSINV "q5"
+#define ROUTI "q6" //output_i, output_q
+#define ROUTQ "q7"
+#define RINPI "q8" //input_i, input_q
+#define RINPQ "q9"
+#define R3(x,y,z) x ", " y ", " z "\n\t"
 
     asm volatile( //(the range of q is q0-q15)
         "       vld1.32 {" RDCOS "}, [%[pdcos]]\n\t"
@@ -380,11 +378,11 @@ float shift_addfast_cc(complexf *input, complexf* output, int input_size, shift_
 
         "       cmp %[pinput], %[pinput_end]\n\t" //if(pinput != pinput_end)
         "       bcc for_addfast\n\t"              //    then goto for_addfast
-    :
+        :
         [pinput]"+r"(pinput), [poutput]"+r"(poutput) //output operand list -> C variables that we will change from ASM
-    :
+        :
         [pinput_end]"r"(pinput_end), [pdcos]"r"(pdcos), [pdsin]"r"(pdsin), [sin_start]"r"(sin_start), [cos_start]"r"(cos_start) //input operand list
-    :
+        :
         "memory", "q0", "q1", "q2", "q4", "q5", "q6", "q7", "q8", "q9", "cc" //clobber list
     );
     starting_phase+=input_size*d->phase_increment;
@@ -409,13 +407,12 @@ float shift_addfast_cc(complexf *input, complexf* output, int input_size, shift_
     //fprintf(stderr, "shift_addfast_cc: input_size = %d\n", input_size);
     float cos_start=cos(starting_phase);
     float sin_start=sin(starting_phase);
-    float register cos_vals_0, cos_vals_1, cos_vals_2, cos_vals_3,
-        sin_vals_0, sin_vals_1, sin_vals_2, sin_vals_3,
-        dsin_0 = d->dsin[0], dsin_1 = d->dsin[1], dsin_2 = d->dsin[2], dsin_3 = d->dsin[3],
-        dcos_0 = d->dcos[0], dcos_1 = d->dcos[1], dcos_2 = d->dcos[2], dcos_3 = d->dcos[3];
+    register float cos_vals_0, cos_vals_1, cos_vals_2, cos_vals_3,
+             sin_vals_0, sin_vals_1, sin_vals_2, sin_vals_3,
+             dsin_0 = d->dsin[0], dsin_1 = d->dsin[1], dsin_2 = d->dsin[2], dsin_3 = d->dsin[3],
+             dcos_0 = d->dcos[0], dcos_1 = d->dcos[1], dcos_2 = d->dcos[2], dcos_3 = d->dcos[3];
 
-    for(int i=0;i<input_size/4; i++) //@shift_addfast_cc
-    {
+    for(int i=0; i<input_size/4; i++) { //@shift_addfast_cc
         SADF_L1(0)
         SADF_L1(1)
         SADF_L1(2)
@@ -440,15 +437,12 @@ float shift_addfast_cc(complexf *input, complexf* output, int input_size, shift_
     float cos_start=cos(starting_phase);
     float sin_start=sin(starting_phase);
     float cos_vals[4], sin_vals[4];
-    for(int i=0;i<input_size/4; i++) //@shift_addfast_cc
-    {
-        for(int j=0;j<4;j++) //@shift_addfast_cc
-        {
+    for(int i=0; i<input_size/4; i++) { //@shift_addfast_cc
+        for(int j=0; j<4; j++) { //@shift_addfast_cc
             cos_vals[j] = cos_start * d->dcos[j] - sin_start * d->dsin[j];
             sin_vals[j] = sin_start * d->dcos[j] + cos_start * d->dsin[j];
         }
-        for(int j=0;j<4;j++) //@shift_addfast_cc
-        {
+        for(int j=0; j<4; j++) { //@shift_addfast_cc
             iof(output,4*i+j)=cos_vals[j]*iof(input,4*i+j)-sin_vals[j]*qof(input,4*i+j);
             qof(output,4*i+j)=sin_vals[j]*iof(input,4*i+j)+cos_vals[j]*qof(input,4*i+j);
         }
@@ -478,8 +472,7 @@ int fir_decimate_cc(complexf *input, complexf *output, int input_size, int decim
     //The output buffer should be at least input_length / 3.
     // i: input index | ti: tap index | oi: output index
     int oi=0;
-    for(int i=0; i<input_size; i+=decimation) //@fir_decimate_cc: outer loop
-    {
+    for(int i=0; i<input_size; i+=decimation) { //@fir_decimate_cc: outer loop
         if(i+taps_length>input_size) break;
         register float* pinput=(float*)&(input[i]);
         register float* ptaps=taps;
@@ -487,11 +480,11 @@ int fir_decimate_cc(complexf *input, complexf *output, int input_size, int decim
         float quad_acciq [8];
 
 
-/*
-q0, q1: input signal I sample and Q sample
-q2:     taps
-q4, q5: accumulator for I branch and Q branch (will be the output)
-*/
+        /*
+        q0, q1: input signal I sample and Q sample
+        q2:     taps
+        q4, q5: accumulator for I branch and Q branch (will be the output)
+        */
 
         asm volatile(
             "       veor q4, q4\n\t"
@@ -504,11 +497,11 @@ q4, q5: accumulator for I branch and Q branch (will be the output)
             "       bcc for_fdccasm\n\t"            //  then goto for_fdcasm
             "       vst1.32 {q4}, [%[quad_acci]]\n\t" //if the loop is finished, store the two accumulators in memory
             "       vst1.32 {q5}, [%[quad_accq]]\n\t"
-        :
+            :
             [pinput]"+r"(pinput), [ptaps]"+r"(ptaps) //output operand list
-        :
+            :
             [ptaps_end]"r"(ptaps_end), [quad_acci]"r"(quad_acciq), [quad_accq]"r"(quad_acciq+4) //input operand list
-        :
+            :
             "memory", "q0", "q1", "q2", "q4", "q5", "cc" //clobber list
         );
         //original for loops for reference:
@@ -534,8 +527,7 @@ int fir_decimate_cc(complexf *input, complexf *output, int input_size, int decim
     //The output buffer should be at least input_length / 3.
     // i: input index | ti: tap index | oi: output index
     int oi=0;
-    for(int i=0; i<input_size; i+=decimation) //@fir_decimate_cc: outer loop
-    {
+    for(int i=0; i<input_size; i+=decimation) { //@fir_decimate_cc: outer loop
         if(i+taps_length>input_size) break;
         float acci=0;
         for(int ti=0; ti<taps_length; ti++) acci += (iof(input,i+ti)) * taps[ti]; //@fir_decimate_cc: i loop
@@ -584,14 +576,12 @@ int fir_interpolate_cc(complexf *input, complexf *output, int input_size, int in
     //ti: secondary index (inside filter function)
     //ip: interpolation phase (0 <= ip < interpolation)
     int oi=0;
-    for(int i=0; i<input_size; i++) //@fir_interpolate_cc: outer loop
-    {
+    for(int i=0; i<input_size; i++) { //@fir_interpolate_cc: outer loop
         if(i*interpolation + (interpolation-1) + taps_length > input_size*interpolation) break;
-        for(int ip=0; ip<interpolation; ip++)
-        {
+        for(int ip=0; ip<interpolation; ip++) {
             float acci=0;
             float accq=0;
-            //int tistart = (interpolation-ip)%interpolation; 
+            //int tistart = (interpolation-ip)%interpolation;
             int tistart = (interpolation-ip); //why does this work? why don't we need the % part?
             for(int ti=tistart, si=0; ti<taps_length; (ti+=interpolation), (si++)) acci += (iof(input,i+si)) * taps[ti]; //@fir_interpolate_cc: i loop
             for(int ti=tistart, si=0; ti<taps_length; (ti+=interpolation), (si++)) accq += (qof(input,i+si)) * taps[ti]; //@fir_interpolate_cc: q loop
@@ -611,18 +601,16 @@ rational_resampler_ff_t rational_resampler_ff(float *input, float *output, int i
     //oi: output index, i: tap index
     int output_size=input_size*interpolation/decimation;
     int oi;
-    int startingi, delayi;
+    int startingi = 0, delayi = 0;
     //fprintf(stderr,"rational_resampler_ff | interpolation = %d | decimation = %d\ntaps_length = %d | input_size = %d | output_size = %d | last_taps_delay = %d\n",interpolation,decimation,taps_length,input_size,output_size,last_taps_delay);
-    for (oi=0; oi<output_size; oi++) //@rational_resampler_ff (outer loop)
-    {
+    for (oi=0; oi<output_size; oi++) { //@rational_resampler_ff (outer loop)
         float acc=0;
         startingi=(oi*decimation+interpolation-1-last_taps_delay)/interpolation; //index of first input item to apply FIR on
         //delayi=startingi*interpolation-oi*decimation; //delay on FIR taps
         delayi=(last_taps_delay+startingi*interpolation-oi*decimation)%interpolation; //delay on FIR taps
         if(startingi+taps_length/interpolation+1>input_size) break; //we can't compute the FIR filter to some input samples at the end
         //fprintf(stderr,"outer loop | oi = %d | startingi = %d | taps delay = %d\n",oi,startingi,delayi);
-        for(int i=0; i<(taps_length-delayi)/interpolation; i++) //@rational_resampler_ff (inner loop)
-        {
+        for(int i=0; i<(taps_length-delayi)/interpolation; i++) { //@rational_resampler_ff (inner loop)
             //fprintf(stderr,"inner loop | input index = %d | tap index = %d | acc = %g\n",startingi+ii,i,acc);
             acc+=input[startingi+i]*taps[delayi+i*interpolation];
         }
@@ -672,10 +660,10 @@ void rational_resampler_get_lowpass_f(float* output, int output_size, int interp
     firdes_lowpass_f(output, output_size, cutoff/2, window);
 }
 
-float inline fir_one_pass_ff(float* input, float* taps, int taps_length)
+inline float fir_one_pass_ff(float* input, float* taps, int taps_length)
 {
     float acc=0;
-    for(int i=0;i<taps_length;i++) acc+=taps[i]*input[i]; //@fir_one_pass_ff
+    for(int i=0; i<taps_length; i++) acc+=taps[i]*input[i]; //@fir_one_pass_ff
     return acc;
 }
 
@@ -687,21 +675,19 @@ old_fractional_decimator_ff_t old_fractional_decimator_ff(float* input, float* o
     int oi=0;
     int index_high;
     float where=d.remain;
-    float result_high, result_low;
-    if(where==0.0) //in the first iteration index_high may be zero (so using the item index_high-1 would lead to invalid memory access).
-    {
+    float result_high = 0.0, result_low = 0.0;
+    if(where==0.0) { //in the first iteration index_high may be zero (so using the item index_high-1 would lead to invalid memory access).
         output[oi++]=fir_one_pass_ff(input,taps,taps_length);
         where+=rate;
     }
 
     int previous_index_high=-1;
     //we optimize to calculate ceilf(where) only once every iteration, so we do it here:
-    for(;(index_high=ceilf(where))+taps_length<input_size;where+=rate) //@fractional_decimator_ff
-    {
+    for(; (index_high=ceilf(where))+taps_length<input_size; where+=rate) { //@fractional_decimator_ff
         if(previous_index_high==index_high-1) result_low=result_high; //if we step less than 2.0 then we do already have the result for the FIR filter for that index
         else result_low=fir_one_pass_ff(input+index_high-1,taps,taps_length);
         result_high=fir_one_pass_ff(input+index_high,taps,taps_length);
-        float register rate_between_samples=where-index_high+1;
+        register float rate_between_samples=where-index_high+1;
         output[oi++]=result_low*(1-rate_between_samples)+result_high*rate_between_samples;
         previous_index_high=index_high;
     }
@@ -724,20 +710,18 @@ fractional_decimator_ff_t fractional_decimator_ff_init(float rate, int num_poly_
     //-2,-1,0,1,2,3
     d.xifirst=-(num_poly_points/2)+1, d.xilast=num_poly_points/2;
     int id = 0; //index in poly_precalc_denomiator
-    for(int xi=d.xifirst;xi<=d.xilast;xi++)
-    {
+    for(int xi=d.xifirst; xi<=d.xilast; xi++) {
         d.poly_precalc_denomiator[id]=1;
-        for(int xj=d.xifirst;xj<=d.xilast;xj++)
-        {
+        for(int xj=d.xifirst; xj<=d.xilast; xj++) {
             if(xi!=xj) d.poly_precalc_denomiator[id] *= (xi-xj); //poly_precalc_denomiator could be integer as well. But that would later add a necessary conversion.
         }
         id++;
     }
     d.where=-d.xifirst;
-    d.coeffs_buf=(float*)malloc(d.num_poly_points*sizeof(float)); 
-    d.filtered_buf=(float*)malloc(d.num_poly_points*sizeof(float)); 
+    d.coeffs_buf=(float*)malloc(d.num_poly_points*sizeof(float));
+    d.filtered_buf=(float*)malloc(d.num_poly_points*sizeof(float));
     //d.last_inputs_circbuf = (float)malloc(d.num_poly_points*sizeof(float));
-    //d.last_inputs_startsat = 0; 
+    //d.last_inputs_startsat = 0;
     //d.last_inputs_samplewhere = -1;
     //for(int i=0;i<num_poly_points; i++) d.last_inputs_circbuf[i] = 0;
     d.rate = rate;
@@ -754,35 +738,31 @@ void fractional_decimator_ff(float* input, float* output, int input_size, fracti
     //It applies polynomial interpolation to samples that are taken into consideration from a pre-filtered input.
     //The pre-filter can be switched off by applying taps=NULL.
     //fprintf(stderr, "drate=%f\n", d->rate);
-    if(DEBUG_ASSERT) assert(d->rate > 1.0); 
+    if(DEBUG_ASSERT) assert(d->rate > 1.0);
     if(DEBUG_ASSERT) assert(d->where >= -d->xifirst);
     int oi=0; //output index
-    int index_high; 
+    int index_high;
 #define FD_INDEX_LOW (index_high-1)
     //we optimize to calculate ceilf(where) only once every iteration, so we do it here:
-    for(;(index_high=ceilf(d->where))+d->num_poly_points+d->taps_length<input_size;d->where+=d->rate) //@fractional_decimator_ff
-    {
+    for(; (index_high=ceilf(d->where))+d->num_poly_points+d->taps_length<input_size; d->where+=d->rate) { //@fractional_decimator_ff
         //d->num_poly_points above is theoretically more than we could have here, but this makes the spectrum look good
-        int sxifirst = FD_INDEX_LOW + d->xifirst; 
-        int sxilast = FD_INDEX_LOW + d->xilast; 
-        if(d->taps) 
-            for(int wi=0;wi<d->num_poly_points;wi++) d->filtered_buf[wi] = fir_one_pass_ff(input+FD_INDEX_LOW+wi, d->taps, d->taps_length);
+        //int sxifirst = FD_INDEX_LOW + d->xifirst;
+        //int sxilast = FD_INDEX_LOW + d->xilast;
+        if(d->taps)
+            for(int wi=0; wi<d->num_poly_points; wi++) d->filtered_buf[wi] = fir_one_pass_ff(input+FD_INDEX_LOW+wi, d->taps, d->taps_length);
         else
-            for(int wi=0;wi<d->num_poly_points;wi++) d->filtered_buf[wi] = *(input+FD_INDEX_LOW+wi);
+            for(int wi=0; wi<d->num_poly_points; wi++) d->filtered_buf[wi] = *(input+FD_INDEX_LOW+wi);
         int id=0;
         float xwhere = d->where - FD_INDEX_LOW;
-        for(int xi=d->xifirst;xi<=d->xilast;xi++)
-        {
+        for(int xi=d->xifirst; xi<=d->xilast; xi++) {
             d->coeffs_buf[id]=1;
-            for(int xj=d->xifirst;xj<=d->xilast;xj++)
-            {
+            for(int xj=d->xifirst; xj<=d->xilast; xj++) {
                 if(xi!=xj) d->coeffs_buf[id] *= (xwhere-xj);
             }
-            id++;       
+            id++;
         }
         float acc = 0;
-        for(int i=0;i<d->num_poly_points;i++)
-        {
+        for(int i=0; i<d->num_poly_points; i++) {
             acc += (d->coeffs_buf[i]/d->poly_precalc_denomiator[i])*d->filtered_buf[i];  //(xnom/xden)*yn
         }
         output[oi++]=acc;
@@ -822,8 +802,7 @@ void apply_fir_fft_cc(FFT_PLAN_T* plan, FFT_PLAN_T* plan_inverse, complexf* taps
     complexf* in = plan->output;
     complexf* out = plan_inverse->input;
 
-    for(int i=0;i<plan->size;i++) //@apply_fir_fft_cc: multiplication
-    {
+    for(int i=0; i<plan->size; i++) { //@apply_fir_fft_cc: multiplication
         iof(out,i)=iof(in,i)*iof(taps_fft,i)-qof(in,i)*qof(taps_fft,i);
         qof(out,i)=iof(in,i)*qof(taps_fft,i)+qof(in,i)*iof(taps_fft,i);
     }
@@ -834,14 +813,12 @@ void apply_fir_fft_cc(FFT_PLAN_T* plan, FFT_PLAN_T* plan_inverse, complexf* taps
     //add the overlap of the previous segment
     complexf* result = plan_inverse->output;
 
-    for(int i=0;i<plan->size;i++) //@apply_fir_fft_cc: normalize by fft_size
-    {
+    for(int i=0; i<plan->size; i++) { //@apply_fir_fft_cc: normalize by fft_size
         iof(result,i)/=plan->size;
         qof(result,i)/=plan->size;
     }
 
-    for(int i=0;i<overlap_size;i++) //@apply_fir_fft_cc: add overlap
-    {
+    for(int i=0; i<overlap_size; i++) { //@apply_fir_fft_cc: add overlap
         iof(result,i)=iof(result,i)+iof(last_overlap,i);
         qof(result,i)=qof(result,i)+qof(last_overlap,i);
     }
@@ -861,13 +838,11 @@ void apply_fir_fft_cc(FFT_PLAN_T* plan, FFT_PLAN_T* plan_inverse, complexf* taps
 void amdemod_cf(complexf* input, float *output, int input_size)
 {
     //@amdemod: i*i+q*q
-    for (int i=0; i<input_size; i++)
-    {
+    for (int i=0; i<input_size; i++) {
         output[i]=iof(input,i)*iof(input,i)+qof(input,i)*qof(input,i);
     }
     //@amdemod: sqrt
-    for (int i=0; i<input_size; i++)
-    {
+    for (int i=0; i<input_size; i++) {
         output[i]=sqrt(output[i]);
     }
 }
@@ -878,15 +853,13 @@ void amdemod_estimator_cf(complexf* input, float *output, int input_size, float 
     //http://www.dspguru.com/dsp/tricks/magnitude-estimator
 
     //default: optimize for min RMS error
-    if(alpha==0)
-    {
+    if(alpha==0) {
         alpha=0.947543636291;
         beta=0.392485425092;
     }
 
     //@amdemod_estimator
-    for (int i=0; i<input_size; i++)
-    {
+    for (int i=0; i<input_size; i++) {
         float abs_i=iof(input,i);
         if(abs_i<0) abs_i=-abs_i;
         float abs_q=qof(input,i);
@@ -908,8 +881,7 @@ dcblock_preserve_t dcblock_ff(float* input, float* output, int input_size, float
     //preserve can be initialized to zero on first run.
     if(a==0) a=0.999; //default value, simulate in octave: freqz([1 -1],[1 -0.99])
     output[0]=input[0]-preserved.last_input+a*preserved.last_output;
-    for(int i=1; i<input_size; i++) //@dcblock_f
-    {
+    for(int i=1; i<input_size; i++) { //@dcblock_f
         output[i]=input[i]-input[i-1]+a*output[i-1];
     }
     preserved.last_input=input[input_size-1];
@@ -924,16 +896,14 @@ float fastdcblock_ff(float* input, float* output, int input_size, float last_dc_
     //input and output buffer is allowed to be the same
     //http://www.digitalsignallabs.com/dcblock.pdf
     float avg=0.0;
-    for(int i=0;i<input_size;i++) //@fastdcblock_ff: calculate block average
-    {
+    for(int i=0; i<input_size; i++) { //@fastdcblock_ff: calculate block average
         avg+=input[i];
     }
     avg/=input_size;
 
     float avgdiff=avg-last_dc_level;
     //DC removal level will change lineraly from last_dc_level to avg.
-    for(int i=0;i<input_size;i++) //@fastdcblock_ff: remove DC component
-    {
+    for(int i=0; i<input_size; i++) { //@fastdcblock_ff: remove DC component
         float dc_removal_level=last_dc_level+avgdiff*((float)i/input_size);
         output[i]=input[i]-dc_removal_level;
     }
@@ -956,8 +926,7 @@ void fastagc_ff(fastagc_ff_t* input, float* output)
 
     //Get the peak value of new input buffer
     float peak_input=0;
-    for(int i=0;i<input->input_size;i++) //@fastagc_ff: peak search
-    {
+    for(int i=0; i<input->input_size; i++) { //@fastagc_ff: peak search
         float val=fabs(input->buffer_input[i]);
         if(val>peak_input) peak_input=val;
     }
@@ -972,8 +941,7 @@ void fastagc_ff(fastagc_ff_t* input, float* output)
     if(target_gain>FASTAGC_MAX_GAIN) target_gain=FASTAGC_MAX_GAIN;
     //fprintf(stderr, "target_gain: %g\n",target_gain);
 
-    for(int i=0;i<input->input_size;i++) //@fastagc_ff: apply gain
-    {
+    for(int i=0; i<input->input_size; i++) { //@fastagc_ff: apply gain
         float rate=(float)i/input->input_size;
         float gain=input->last_gain*(1.0-rate)+target_gain*rate;
         output[i]=input->buffer_1[i]*gain;
@@ -1006,8 +974,7 @@ float fmdemod_atan_cf(complexf* input, float *output, int input_size, float last
     //GCC most likely won't vectorize nor atan, nor atan2.
     //For more comments, look at: https://github.com/simonyiszk/minidemod/blob/master/minidemod-wfm-atan.c
     float phase, dphase;
-    for (int i=0; i<input_size; i++) //@fmdemod_atan_novect
-    {
+    for (int i=0; i<input_size; i++) { //@fmdemod_atan_novect
         phase=argof(input,i);
         dphase=phase-last_phase;
         if(dphase<-PI) dphase+=2*PI;
@@ -1024,8 +991,7 @@ float fmdemod_atan_cf(complexf* input, float *output, int input_size, float last
 complexf fmdemod_quadri_novect_cf(complexf* input, float* output, int input_size, complexf last_sample)
 {
     output[0]=fmdemod_quadri_K*(iof(input,0)*(qof(input,0)-last_sample.q)-qof(input,0)*(iof(input,0)-last_sample.i))/(iof(input,0)*iof(input,0)+qof(input,0)*qof(input,0));
-    for (int i=1; i<input_size; i++) //@fmdemod_quadri_novect_cf
-    {
+    for (int i=1; i<input_size; i++) { //@fmdemod_quadri_novect_cf
         float qnow=qof(input,i);
         float qlast=qof(input,i-1);
         float inow=iof(input,i);
@@ -1043,27 +1009,22 @@ complexf fmdemod_quadri_cf(complexf* input, float* output, int input_size, float
     float* temp_di=temp+input_size;
 
     temp_dq[0]=qof(input,0)-last_sample.q;
-    for (int i=1; i<input_size; i++) //@fmdemod_quadri_cf: dq
-    {
+    for (int i=1; i<input_size; i++) { //@fmdemod_quadri_cf: dq
         temp_dq[i]=qof(input,i)-qof(input,i-1);
     }
 
     temp_di[0]=iof(input,0)-last_sample.i;
-    for (int i=1; i<input_size; i++) //@fmdemod_quadri_cf: di
-    {
+    for (int i=1; i<input_size; i++) { //@fmdemod_quadri_cf: di
         temp_di[i]=iof(input,i)-iof(input,i-1);
     }
 
-    for (int i=0; i<input_size; i++) //@fmdemod_quadri_cf: output numerator
-    {
+    for (int i=0; i<input_size; i++) { //@fmdemod_quadri_cf: output numerator
         output[i]=(iof(input,i)*temp_dq[i]-qof(input,i)*temp_di[i]);
     }
-    for (int i=0; i<input_size; i++) //@fmdemod_quadri_cf: output denomiator
-    {
+    for (int i=0; i<input_size; i++) { //@fmdemod_quadri_cf: output denomiator
         temp[i]=iof(input,i)*iof(input,i)+qof(input,i)*qof(input,i);
     }
-    for (int i=0; i<input_size; i++) //@fmdemod_quadri_cf: output division
-    {
+    for (int i=0; i<input_size; i++) { //@fmdemod_quadri_cf: output division
         output[i]=(temp[i])?fmdemod_quadri_K*output[i]/temp[i]:0;
     }
 
@@ -1091,8 +1052,8 @@ float deemphasis_wfm_ff (float* input, float* output, int input_size, float tau,
     float alpha = dt/(tau+dt);
     if(is_nan(last_output)) last_output=0.0; //if last_output is NaN
     output[0]=alpha*input[0]+(1-alpha)*last_output;
-    for (int i=1;i<input_size;i++) //@deemphasis_wfm_ff
-       output[i]=alpha*input[i]+(1-alpha)*output[i-1]; //this is the simplest IIR LPF
+    for (int i=1; i<input_size; i++) //@deemphasis_wfm_ff
+        output[i]=alpha*input[i]+(1-alpha)*output[i-1]; //this is the simplest IIR LPF
     return output[input_size-1];
 }
 
@@ -1118,10 +1079,9 @@ int deemphasis_nfm_ff (float* input, float* output, int input_size, int sample_r
 
     if(!taps_length) return 0; //sample rate n
     int i;
-    for(i=0;i<input_size-taps_length;i++) //@deemphasis_nfm_ff: outer loop
-    {
+    for(i=0; i<input_size-taps_length; i++) { //@deemphasis_nfm_ff: outer loop
         float acc=0;
-        for(int ti=0;ti<taps_length;ti++) acc+=taps[ti]*input[i+ti]; //@deemphasis_nfm_ff: inner loop
+        for(int ti=0; ti<taps_length; ti++) acc+=taps[ti]*input[i+ti]; //@deemphasis_nfm_ff: inner loop
         output[i]=acc;
     }
     return i; //number of samples processed (and output samples)
@@ -1129,8 +1089,7 @@ int deemphasis_nfm_ff (float* input, float* output, int input_size, int sample_r
 
 void limit_ff(float* input, float* output, int input_size, float max_amplitude)
 {
-    for (int i=0; i<input_size; i++) //@limit_ff
-    {
+    for (int i=0; i<input_size; i++) { //@limit_ff
         output[i]=(max_amplitude<input[i])?max_amplitude:input[i];
         output[i]=(-max_amplitude>output[i])?-max_amplitude:output[i];
     }
@@ -1138,14 +1097,13 @@ void limit_ff(float* input, float* output, int input_size, float max_amplitude)
 
 void gain_ff(float* input, float* output, int input_size, float gain)
 {
-    for(int i=0;i<input_size;i++) output[i]=gain*input[i]; //@gain_ff
+    for(int i=0; i<input_size; i++) output[i]=gain*input[i]; //@gain_ff
 }
 
 float get_power_f(float* input, int input_size, int decimation)
 {
     float acc = 0;
-    for(int i=0;i<input_size;i+=decimation)
-    {
+    for(int i=0; i<input_size; i+=decimation) {
         acc += (input[i]*input[i])/input_size;
     }
     return acc;
@@ -1154,15 +1112,14 @@ float get_power_f(float* input, int input_size, int decimation)
 float get_power_c(complexf* input, int input_size, int decimation)
 {
     float acc = 0;
-    for(int i=0;i<input_size;i+=decimation)
-    {
+    for(int i=0; i<input_size; i+=decimation) {
         acc += (iof(input,i)*iof(input,i)+qof(input,i)*qof(input,i))/input_size;
     }
     return acc;
 }
 
 /*
-  __  __           _       _       _ 
+  __  __           _       _       _
  |  \/  |         | |     | |     |  |
  | \  / | ___   __| |_   _| | __ _|  |_ ___  _ __ ___
  | |\/| |/ _ \ / _` | | | | |/ _` |  __/ _ \| '__/ __|
@@ -1173,15 +1130,14 @@ float get_power_c(complexf* input, int input_size, int decimation)
 
 void add_dcoffset_cc(complexf* input, complexf* output, int input_size)
 {
-    for(int i=0;i<input_size;i++) iof(output,i)=0.5+iof(input,i)/2;
-    for(int i=0;i<input_size;i++) qof(output,i)=qof(input,i)/2;
+    for(int i=0; i<input_size; i++) iof(output,i)=0.5+iof(input,i)/2;
+    for(int i=0; i<input_size; i++) qof(output,i)=qof(input,i)/2;
 }
 
 float fmmod_fc(float* input, complexf* output, int input_size, float last_phase)
 {
     float phase=last_phase;
-    for(int i=0;i<input_size;i++)
-    {
+    for(int i=0; i<input_size; i++) {
         phase+=input[i]*PI;
         while(phase>PI) phase-=2*PI;
         while(phase<=-PI) phase+=2*PI;
@@ -1193,8 +1149,7 @@ float fmmod_fc(float* input, complexf* output, int input_size, float last_phase)
 
 void fixed_amplitude_cc(complexf* input, complexf* output, int input_size, float new_amplitude)
 {
-    for(int i=0;i<input_size;i++)
-    {
+    for(int i=0; i<input_size; i++) {
         //float phase=atan2(iof(input,i),qof(input,i));
         //iof(output,i)=cos(phase)*amp;
         //qof(output,i)=sin(phase)*amp;
@@ -1220,10 +1175,8 @@ void fixed_amplitude_cc(complexf* input, complexf* output, int input_size, float
 int log2n(int x)
 {
     int result=-1;
-    for(int i=0;i<31;i++)
-    {
-        if((x>>i)&1) //@@log2n
-        {
+    for(int i=0; i<31; i++) {
+        if((x>>i)&1) { //@@log2n
             if (result==-1) result=i;
             else return -1;
         }
@@ -1235,8 +1188,7 @@ int next_pow2(int x)
 {
     int pow2;
     //portability? (31 is the problem)
-    for(int i=0;i<31;i++)
-    {
+    for(int i=0; i<31; i++) {
         if(x<(pow2=1<<i)) return pow2; //@@next_pow2
     }
     return -1;
@@ -1245,8 +1197,7 @@ int next_pow2(int x)
 void apply_window_c(complexf* input, complexf* output, int size, window_t window)
 {
     float (*window_function)(float)=firdes_get_window_kernel(window);
-    for(int i=0;i<size;i++) //@apply_window_c
-    {
+    for(int i=0; i<size; i++) { //@apply_window_c
         float rate=(float)i/(size-1);
         iof(output,i)=iof(input,i)*window_function(2.0*rate+1.0);
         qof(output,i)=qof(input,i)*window_function(2.0*rate+1.0);
@@ -1258,8 +1209,7 @@ float *precalculate_window(int size, window_t window)
     float (*window_function)(float)=firdes_get_window_kernel(window);
     float *windowt;
     windowt = malloc(sizeof(float) * size);
-    for(int i=0;i<size;i++) //@precalculate_window
-    {
+    for(int i=0; i<size; i++) { //@precalculate_window
         float rate=(float)i/(size-1);
         windowt[i] = window_function(2.0*rate+1.0);
     }
@@ -1268,8 +1218,7 @@ float *precalculate_window(int size, window_t window)
 
 void apply_precalculated_window_c(complexf* input, complexf* output, int size, float *windowt)
 {
-    for(int i=0;i<size;i++) //@apply_precalculated_window_c
-    {
+    for(int i=0; i<size; i++) { //@apply_precalculated_window_c
         iof(output,i)=iof(input,i)*windowt[i];
         qof(output,i)=qof(input,i)*windowt[i];
     }
@@ -1277,17 +1226,15 @@ void apply_precalculated_window_c(complexf* input, complexf* output, int size, f
 
 void apply_precalculated_window_f(float* input, float* output, int size, float *windowt)
 {
-	for(int i=0;i<size;i++) //@apply_precalculated_window_f
-	{
-		output[i] = input[i] * windowt[i];
-	}
+    for(int i=0; i<size; i++) { //@apply_precalculated_window_f
+        output[i] = input[i] * windowt[i];
+    }
 }
 
 void apply_window_f(float* input, float* output, int size, window_t window)
 {
     float (*window_function)(float)=firdes_get_window_kernel(window);
-    for(int i=0;i<size;i++) //@apply_window_f
-    {
+    for(int i=0; i<size; i++) { //@apply_window_f
         float rate=(float)i/(size-1);
         output[i]=input[i]*window_function(2.0*rate+1.0);
     }
@@ -1295,28 +1242,29 @@ void apply_window_f(float* input, float* output, int size, window_t window)
 
 void logpower_cf(complexf* input, float* output, int size, float add_db)
 {
-    for(int i=0;i<size;i++) output[i]=iof(input,i)*iof(input,i) + qof(input,i)*qof(input,i); //@logpower_cf: pass 1
+    for(int i=0; i<size; i++) output[i]=iof(input,i)*iof(input,i) + qof(input,i)*qof(input,i); //@logpower_cf: pass 1
 
-    for(int i=0;i<size;i++) output[i]=log10(output[i]); //@logpower_cf: pass 2
+    for(int i=0; i<size; i++) output[i]=log10(output[i]); //@logpower_cf: pass 2
 
-    for(int i=0;i<size;i++) output[i]=10*output[i]+add_db; //@logpower_cf: pass 3
+    for(int i=0; i<size; i++) output[i]=10*output[i]+add_db; //@logpower_cf: pass 3
 }
 
 void accumulate_power_cf(complexf* input, float* output, int size)
 {
-    for(int i=0;i<size;i++) output[i] += iof(input,i)*iof(input,i) + qof(input,i)*qof(input,i); //@logpower_cf: pass 1
+    for(int i=0; i<size; i++) output[i] += iof(input,i)*iof(input,i) + qof(input,i)*qof(input,i); //@logpower_cf: pass 1
 }
 
-void log_ff(float* input, float* output, int size, float add_db) {
-    for(int i=0;i<size;i++) output[i]=log10(input[i]); //@logpower_cf: pass 2
+void log_ff(float* input, float* output, int size, float add_db)
+{
+    for(int i=0; i<size; i++) output[i]=log10(input[i]); //@logpower_cf: pass 2
 
-    for(int i=0;i<size;i++) output[i]=10*output[i]+add_db; //@logpower_cf: pass 3
+    for(int i=0; i<size; i++) output[i]=10*output[i]+add_db; //@logpower_cf: pass 3
 }
 
 float total_logpower_cf(complexf* input, int input_size)
 {
-    float acc = 0; 
-    for(int i=0;i<input_size;i++) acc+=(iof(input,i)*iof(input,i) + qof(input,i)*qof(input,i));
+    float acc = 0;
+    for(int i=0; i<input_size; i++) acc+=(iof(input,i)*iof(input,i) + qof(input,i)*qof(input,i));
     return 10*log10(acc/input_size);
 }
 
@@ -1331,8 +1279,7 @@ float total_logpower_cf(complexf* input, int input_size)
            |___/
 */
 
-psk31_varicode_item_t psk31_varicode_items[] =
-{
+psk31_varicode_item_t psk31_varicode_items[] = {
     { .code = 0b1010101011, .bitcount=10,   .ascii=0x00 }, //NUL, null
     { .code = 0b1011011011, .bitcount=10,   .ascii=0x01 }, //SOH, start of heading
     { .code = 0b1011101101, .bitcount=10,   .ascii=0x02 }, //STX, start of text
@@ -1463,8 +1410,7 @@ psk31_varicode_item_t psk31_varicode_items[] =
     { .code = 0b1110110101, .bitcount=10,   .ascii=0x7f }, //DEL
 };
 
-unsigned long long psk31_varicode_masklen_helper[] =
-{
+unsigned long long psk31_varicode_masklen_helper[] = {
     0b0000000000000000000000000000000000000000000000000000000000000000,
     0b0000000000000000000000000000000000000000000000000000000000000001,
     0b0000000000000000000000000000000000000000000000000000000000000011,
@@ -1537,12 +1483,12 @@ char psk31_varicode_decoder_push(unsigned long long* status_shr, unsigned char s
 {
     *status_shr=((*status_shr)<<1)|(!!symbol); //shift new bit in shift register
     //fprintf(stderr,"*status_shr = %llx\n", *status_shr);
-    if((*status_shr)&0xFFF==0) return 0;
-    for(int i=0;i<n_psk31_varicode_items;i++)
-    {
+    if(((*status_shr)&0xFFF)==0) return 0;
+    for(int i=0; i<n_psk31_varicode_items; i++) {
         //fprintf(stderr,"| i = %d | %llx ?= %llx | bitsall = %d\n", i, psk31_varicode_items[i].code<<2, (*status_shr)&psk31_varicode_masklen_helper[(psk31_varicode_items[i].bitcount+4)&63], (psk31_varicode_items[i].bitcount+4)&63);
-        if((psk31_varicode_items[i].code<<2)==((*status_shr)&psk31_varicode_masklen_helper[(psk31_varicode_items[i].bitcount+4)&63]))
-            { /*fprintf(stderr,">>>>>>>>> %d %x %c\n", i,  psk31_varicode_items[i].ascii,  psk31_varicode_items[i].ascii);*/ return psk31_varicode_items[i].ascii; }
+        if((psk31_varicode_items[i].code<<2)==((*status_shr)&psk31_varicode_masklen_helper[(psk31_varicode_items[i].bitcount+4)&63])) {
+            /*fprintf(stderr,">>>>>>>>> %d %x %c\n", i,  psk31_varicode_items[i].ascii,  psk31_varicode_items[i].ascii);*/ return psk31_varicode_items[i].ascii;
+        }
 
     }
     return 0;
@@ -1551,18 +1497,14 @@ char psk31_varicode_decoder_push(unsigned long long* status_shr, unsigned char s
 void psk31_varicode_encoder_u8_u8(unsigned char* input, unsigned char* output, int input_size, int output_max_size, int* input_processed, int* output_size)
 {
     (*output_size)=0;
-    for((*input_processed)=0; (*input_processed)<input_size; (*input_processed)++)
-    {
+    for((*input_processed)=0; (*input_processed)<input_size; (*input_processed)++) {
         //fprintf(stderr, "ii = %d, input_size = %d, output_max_size = %d\n", *input_processed, input_size, output_max_size);
-        for(int ci=0; ci<n_psk31_varicode_items; ci++) //ci: character index
-        {
+        for(int ci=0; ci<n_psk31_varicode_items; ci++) { //ci: character index
             psk31_varicode_item_t current_varicode = psk31_varicode_items[ci];
-            if(input[*input_processed]==current_varicode.ascii)
-            {
+            if(input[*input_processed]==current_varicode.ascii) {
                 //fprintf(stderr, "ci = %d\n", ci);
                 if(output_max_size<current_varicode.bitcount+2) return;
-                for(int bi=0; bi<current_varicode.bitcount+2; bi++) //bi: bit index
-                {
+                for(int bi=0; bi<current_varicode.bitcount+2; bi++) { //bi: bit index
                     //fprintf(stderr, "bi = %d\n", bi);
                     output[*output_size] = (bi<current_varicode.bitcount) ? (psk31_varicode_items[ci].code>>(current_varicode.bitcount-bi-1))&1 : 0;
                     (*output_size)++;
@@ -1574,8 +1516,7 @@ void psk31_varicode_encoder_u8_u8(unsigned char* input, unsigned char* output, i
     }
 }
 
-rtty_baudot_item_t rtty_baudot_items[] =
-{
+rtty_baudot_item_t rtty_baudot_items[] = {
     { .code = 0b00000, .ascii_letter=0,     .ascii_figure=0 },
     { .code = 0b10000, .ascii_letter='E',   .ascii_figure='3' },
     { .code = 0b01000, .ascii_letter='\n',  .ascii_figure='\n' },
@@ -1612,9 +1553,15 @@ const int n_rtty_baudot_items = sizeof(rtty_baudot_items) / sizeof(rtty_baudot_i
 
 char rtty_baudot_decoder_lookup(unsigned char* fig_mode, unsigned char c)
 {
-    if(c==RTTY_FIGURE_MODE_SELECT_CODE) { *fig_mode=1; return 0; }
-    if(c==RTTY_LETTER_MODE_SELECT_CODE) { *fig_mode=0; return 0; }
-    for(int i=0;i<n_rtty_baudot_items;i++)
+    if(c==RTTY_FIGURE_MODE_SELECT_CODE) {
+        *fig_mode=1;
+        return 0;
+    }
+    if(c==RTTY_LETTER_MODE_SELECT_CODE) {
+        *fig_mode=0;
+        return 0;
+    }
+    for(int i=0; i<n_rtty_baudot_items; i++)
         if(rtty_baudot_items[i].code==c)
             return (*fig_mode) ? rtty_baudot_items[i].ascii_figure : rtty_baudot_items[i].ascii_letter;
     return 0;
@@ -1626,34 +1573,43 @@ char rtty_baudot_decoder_push(rtty_baudot_decoder_t* s, unsigned char symbol)
     //RTTY is much like an UART data transfer with 1 start bit, 5 data bits and 1 stop bit.
     //The start pulse and stop pulse are used for synchronization.
     symbol=!!symbol; //We want symbol to be 0 or 1.
-    switch(s->state)
-    {
+    switch(s->state) {
     case RTTY_BAUDOT_WAITING_STOP_PULSE:
-        if(symbol==1) { s->state = RTTY_BAUDOT_WAITING_START_PULSE; if(s->character_received) return rtty_baudot_decoder_lookup(&s->fig_mode, s->shr&31); }
-            //If the character data is followed by a stop pulse, then we go on to wait for the next character.
+        if(symbol==1) {
+            s->state = RTTY_BAUDOT_WAITING_START_PULSE;
+            if(s->character_received) return rtty_baudot_decoder_lookup(&s->fig_mode, s->shr&31);
+        }
+        //If the character data is followed by a stop pulse, then we go on to wait for the next character.
         else  s->character_received = 0;
-            //The character should be followed by a stop pulse. If the stop pulse is missing, that is certainly an error.
-            //In that case, we remove forget the character we just received.
+        //The character should be followed by a stop pulse. If the stop pulse is missing, that is certainly an error.
+        //In that case, we remove forget the character we just received.
         break;
     case RTTY_BAUDOT_WAITING_START_PULSE:
         s->character_received = 0;
-        if(symbol==0) { s->state = RTTY_BAUDOT_RECEIVING_DATA; s->shr = s->bit_cntr = 0; }
-            //Any number of high bits can come after each other, until interrupted with a low bit (start pulse) to indicate
-            //the beginning of a new character. If we get this start pulse, we go on to wait for the characters. We also
-            //clear the variables used for counting (bit_cntr) and storing (shr) the data bits.
+        if(symbol==0) {
+            s->state = RTTY_BAUDOT_RECEIVING_DATA;
+            s->shr = s->bit_cntr = 0;
+        }
+        //Any number of high bits can come after each other, until interrupted with a low bit (start pulse) to indicate
+        //the beginning of a new character. If we get this start pulse, we go on to wait for the characters. We also
+        //clear the variables used for counting (bit_cntr) and storing (shr) the data bits.
         break;
     case RTTY_BAUDOT_RECEIVING_DATA:
         s->shr = (s->shr<<1)|(!!symbol);
-            //We store 5 bits into our shift register
-        if(s->bit_cntr++==4) { s->state = RTTY_BAUDOT_WAITING_STOP_PULSE; s->character_received = 1; }
-            //If this is the 5th bit stored, then we wait for the stop pulse.
+        //We store 5 bits into our shift register
+        if(s->bit_cntr++==4) {
+            s->state = RTTY_BAUDOT_WAITING_STOP_PULSE;
+            s->character_received = 1;
+        }
+        //If this is the 5th bit stored, then we wait for the stop pulse.
         break;
-    default: break;
+    default:
+        break;
     }
     return 0;
 }
 
-#define DEBUG_SERIAL_LINE_DECODER 0
+#define DEBUG_SERIAL_LINE_DECODER NULL
 
 //What has not been checked:
 //  behaviour on 1.5 stop bits
@@ -1668,33 +1624,44 @@ void serial_line_decoder_f_u8(serial_line_t* s, float* input, unsigned char* out
     s->input_used = 0;
     short* output_s = (short*)output;
     unsigned* output_u = (unsigned*)output;
-    for(;;)
-    {
+    for(;;) {
         //we find the start bit (first negative edge on the line)
         int startbit_start = -1;
         int i;
-        for(i=1;i<input_size;i++) if(input[i] < 0 && input[i-1] > 0) { startbit_start=i; break; }
+        for(i=1; i<input_size; i++) if(input[i] < 0 && input[i-1] > 0) {
+                startbit_start=i;
+                break;
+            }
 
-        if(startbit_start == -1) { s->input_used += i; DEBUG_SERIAL_LINE_DECODER && fprintf(stderr,"sld:startbit_not_found (+%d)\n", s->input_used); return; }
+        if(startbit_start == -1) {
+            s->input_used += i;
+            DEBUG_SERIAL_LINE_DECODER && fprintf(stderr,"sld:startbit_not_found (+%d)\n", s->input_used);
+            return;
+        }
         DEBUG_SERIAL_LINE_DECODER && fprintf(stderr,"sld:startbit_found at %d (%d)\n", startbit_start, iabs_samples_helper + startbit_start);
 
         //If the stop bit would be too far so that we reached the end of the buffer, then we return failed.
         //The caller can rearrange the buffer so that the whole character fits into it.
         float all_bits = 1 + s->databits + s->stopbits;
         DEBUG_SERIAL_LINE_DECODER && fprintf(stderr,"sld:all_bits = %f\n", all_bits);
-        if(startbit_start + s->samples_per_bits * all_bits >= input_size) { s->input_used += MAX_M(0,startbit_start-2); DEBUG_SERIAL_LINE_DECODER && fprintf(stderr,"sld:return_stopbit_too_far (+%d)\n", s->input_used); return; }
+        if(startbit_start + s->samples_per_bits * all_bits >= input_size) {
+            s->input_used += MAX_M(0,startbit_start-2);
+            DEBUG_SERIAL_LINE_DECODER && fprintf(stderr,"sld:return_stopbit_too_far (+%d)\n", s->input_used);
+            return;
+        }
 
         //We do the actual sampling.
         int di; //databit counter
         unsigned shr = 0;
-        for(di=0; di < s->databits; di++)
-        {
+        for(di=0; di < s->databits; di++) {
             int databit_start = startbit_start + (1+di+(0.5*(1-s->bit_sampling_width_ratio))) * s->samples_per_bits;
             int databit_end   = startbit_start + (1+di+(0.5*(1+s->bit_sampling_width_ratio))) * s->samples_per_bits;
             DEBUG_SERIAL_LINE_DECODER && fprintf(stderr,"sld:databit_start = %d (%d)\n", databit_start, iabs_samples_helper+databit_start);
             DEBUG_SERIAL_LINE_DECODER && fprintf(stderr,"sld:databit_end   = %d (%d)\n", databit_end,   iabs_samples_helper+databit_end);
             float databit_acc = 0;
-            for(i=databit_start;i<databit_end;i++) { databit_acc += input[i]; /*DEBUG_SERIAL_LINE_DECODER && fprintf(stderr, "%f (%f) ", input[i], databit_acc);*/ }
+            for(i=databit_start; i<databit_end; i++) {
+                databit_acc += input[i]; /*DEBUG_SERIAL_LINE_DECODER && fprintf(stderr, "%f (%f) ", input[i], databit_acc);*/
+            }
             //DEBUG_SERIAL_LINE_DECODER && fprintf(stderr,"\n");
             DEBUG_SERIAL_LINE_DECODER && fprintf(stderr,"sld:databit_decision = %d\n", !!(databit_acc>0));
             shr=(shr<<1)|!!(databit_acc>0);
@@ -1707,9 +1674,16 @@ void serial_line_decoder_f_u8(serial_line_t* s, float* input, unsigned char* out
         DEBUG_SERIAL_LINE_DECODER && fprintf(stderr,"sld:stopbit_start = %d (%d)\n", stopbit_start, iabs_samples_helper+stopbit_start);
         DEBUG_SERIAL_LINE_DECODER && fprintf(stderr,"sld:stopbit_end   = %d (%d)\n", stopbit_end,   iabs_samples_helper+stopbit_end);
         float stopbit_acc = 0;
-        for(i=stopbit_start;i<stopbit_end;i++) { stopbit_acc += input[i]; DEBUG_SERIAL_LINE_DECODER && fprintf(stderr, "%f (%f) ", input[i], stopbit_acc); }
+        for(i=stopbit_start; i<stopbit_end; i++) {
+            stopbit_acc += input[i];
+            DEBUG_SERIAL_LINE_DECODER && fprintf(stderr, "%f (%f) ", input[i], stopbit_acc);
+        }
         DEBUG_SERIAL_LINE_DECODER && fprintf(stderr,"\n");
-        if(stopbit_acc<0) { s->input_used += MIN_M(startbit_start + 1, input_size); DEBUG_SERIAL_LINE_DECODER && fprintf(stderr,"sld:return_stopbit_faulty (+%d)\n", s->input_used); return; }
+        if(stopbit_acc<0) {
+            s->input_used += MIN_M(startbit_start + 1, input_size);
+            DEBUG_SERIAL_LINE_DECODER && fprintf(stderr,"sld:return_stopbit_faulty (+%d)\n", s->input_used);
+            return;
+        }
         DEBUG_SERIAL_LINE_DECODER && fprintf(stderr,"sld:stopbit_found\n");
 
         //we write the output sample
@@ -1723,7 +1697,10 @@ void serial_line_decoder_f_u8(serial_line_t* s, float* input, unsigned char* out
         input += samples_used_up_now;
         input_size -= samples_used_up_now;
         iabs_samples_helper += samples_used_up_now;
-        if(!input_size) { DEBUG_SERIAL_LINE_DECODER && fprintf(stderr,"sld:return_no_more_input (+%d)\n", s->input_used); return; }
+        if(!input_size) {
+            DEBUG_SERIAL_LINE_DECODER && fprintf(stderr,"sld:return_no_more_input (+%d)\n", s->input_used);
+            return;
+        }
     }
     DEBUG_SERIAL_LINE_DECODER && fprintf(stderr, "sld: >> output_size = %d  (+%d)\n", s->output_size, s->input_used);
 }
@@ -1731,32 +1708,23 @@ void serial_line_decoder_f_u8(serial_line_t* s, float* input, unsigned char* out
 void generic_slicer_f_u8(float* input, unsigned char* output, int input_size, int n_symbols)
 {
     float symbol_distance = 2.0/(n_symbols-1);
-    for(int i=0;i<input_size;i++) 
-        for(int j=0;j<n_symbols;j++)
-        {
+    for(int i=0; i<input_size; i++)
+        for(int j=0; j<n_symbols; j++) {
             float symbol_center = -1+j*symbol_distance;
             float symbol_low_limit = symbol_center-(symbol_distance/2);
             float symbol_high_limit = symbol_center+(symbol_distance/2);
-            if(j==0)
-            {
-                if(input[i]<symbol_high_limit) 
-                {
+            if(j==0) {
+                if(input[i]<symbol_high_limit) {
                     output[i]=j;
                     break;
                 }
-            }
-            else if (j==n_symbols-1)
-            {
-                if(input[i]>=symbol_low_limit) 
-                {
+            } else if (j==n_symbols-1) {
+                if(input[i]>=symbol_low_limit) {
                     output[i]=j;
                     break;
                 }
-            }
-            else 
-            {
-                if(input[i]>=symbol_low_limit && input[i]<symbol_high_limit) 
-                {
+            } else {
+                if(input[i]>=symbol_low_limit && input[i]<symbol_high_limit) {
                     output[i]=j;
                     break;
                 }
@@ -1766,15 +1734,14 @@ void generic_slicer_f_u8(float* input, unsigned char* output, int input_size, in
 
 void binary_slicer_f_u8(float* input, unsigned char* output, int input_size)
 {
-    for(int i=0;i<input_size;i++) output[i] = input[i] > 0;
+    for(int i=0; i<input_size; i++) output[i] = input[i] > 0;
 }
 
 void psk_modulator_u8_c(unsigned char* input, complexf* output, int input_size, int n_psk)
 {
     //outputs one complex sample per input symbol
     float phase_increment = (2*M_PI)/n_psk;
-    for(int i=0;i<input_size;i++)
-    {
+    for(int i=0; i<input_size; i++) {
         float out_phase=phase_increment*input[i];
         iof(output,i)=cos(out_phase);
         qof(output,i)=sin(out_phase);
@@ -1784,19 +1751,17 @@ void psk_modulator_u8_c(unsigned char* input, complexf* output, int input_size, 
 void duplicate_samples_ntimes_u8_u8(unsigned char* input, unsigned char* output, int input_size_bytes, int sample_size_bytes, int ntimes)
 {
     int l=0;
-    for(int i=0;i<input_size_bytes;i+=sample_size_bytes)
-        for(int k=0;k<ntimes;k++)
-            for(int j=0;j<sample_size_bytes;j++)
+    for(int i=0; i<input_size_bytes; i+=sample_size_bytes)
+        for(int k=0; k<ntimes; k++)
+            for(int j=0; j<sample_size_bytes; j++)
                 output[l++]=input[i+j];
 }
 
 complexf psk31_interpolate_sine_cc(complexf* input, complexf* output, int input_size, int interpolation, complexf last_input)
 {
     int oi=0; //output index
-    for(int i=0;i<input_size;i++)
-    {
-        for(int j=0; j<interpolation; j++)
-        {
+    for(int i=0; i<input_size; i++) {
+        for(int j=0; j<interpolation; j++) {
             float rate = (1+sin(-(M_PI/2)+M_PI*((j+1)/(float)interpolation)))/2;
             iof(output,oi)=iof(input,i) * rate + iof(&last_input,0) * (1-rate);
             qof(output,oi)=qof(input,i) * rate + qof(&last_input,0) * (1-rate);
@@ -1808,7 +1773,8 @@ complexf psk31_interpolate_sine_cc(complexf* input, complexf* output, int input_
 }
 
 void pack_bits_1to8_u8_u8(unsigned char* input, unsigned char* output, int input_size)
-{ //output size should be input_size × 8
+{
+    //output size should be input_size × 8
     for(int i=0; i<input_size; i++)
         for(int bi=0; bi<8; bi++) //bi: bit index
             *(output++)=(input[i]>>bi)&1;
@@ -1817,9 +1783,8 @@ void pack_bits_1to8_u8_u8(unsigned char* input, unsigned char* output, int input
 
 unsigned char pack_bits_8to1_u8_u8(unsigned char* input)
 {
-    unsigned char output;
-    for(int i=0;i<8;i++)
-    {
+    unsigned char output = '\0';
+    for(int i=0; i<8; i++) {
         output<<=1;
         output|=!!input[i];
     }
@@ -1828,14 +1793,11 @@ unsigned char pack_bits_8to1_u8_u8(unsigned char* input)
 unsigned char differential_codec(unsigned char* input, unsigned char* output, int input_size, int encode, unsigned char state)
 {
     if(!encode)
-        for(int i=0;i<input_size;i++) 
-        {
+        for(int i=0; i<input_size; i++) {
             output[i] = input[i] == state;
             state = input[i];
-        }
-    else
-        for(int i=0;i<input_size;i++) 
-        {
+        } else
+        for(int i=0; i<input_size; i++) {
             if(!input[i]) state=!state;
             output[i] = state;
         }
@@ -1873,8 +1835,7 @@ void pll_cc_init_p_controller(pll_t* p, float alpha)
 
 void pll_cc(pll_t* p, complexf* input, float* output_dphase, complexf* output_nco, int input_size)
 {
-    for(int i=0;i<input_size;i++)
-    {
+    for(int i=0; i<input_size; i++) {
         p->output_phase += p->dphase;
         while(p->output_phase>PI) p->output_phase-=2*PI;
         while(p->output_phase<-PI) p->output_phase+=2*PI;
@@ -1896,19 +1857,15 @@ void pll_cc(pll_t* p, complexf* input, float* output_dphase, complexf* output_nc
         //output_nco[i] = multiply_result;
         //float new_dphase = absof(&multiply_result,0);
 
-        if(p->pll_type == PLL_PI_CONTROLLER)
-        {
+        if(p->pll_type == PLL_PI_CONTROLLER) {
             p->dphase = new_dphase * p->alpha + p->iir_temp;
             p->iir_temp += new_dphase * p->beta;
 
             while(p->dphase>PI) p->dphase-=2*PI; //won't need this one
             while(p->dphase<-PI) p->dphase+=2*PI;
-        }
-        else if(p->pll_type == PLL_P_CONTROLLER)
-        {
+        } else if(p->pll_type == PLL_P_CONTROLLER) {
             p->dphase = new_dphase * p->alpha;
-        }
-        else return;
+        } else return;
         if(output_dphase) output_dphase[i] = -p->dphase;
         //if(output_dphase) output_dphase[i] = new_dphase/10;
     }
@@ -1921,37 +1878,36 @@ void octave_plot_point_on_cplxsig(complexf* signal, int signal_size, float error
     int* points_color = (int*)malloc(sizeof(int)*points_size);
     va_list vl;
     va_start(vl,points_size);
-    for(int i=0;i<points_size;i++)
-    {
+    for(int i=0; i<points_size; i++) {
         points_z[i] = va_arg(vl, int);
         points_color[i] = va_arg(vl, int);
     }
     if(writefiles_path && !figure_output_counter) fprintf(stderr, "cf=figure();\n");
     fprintf(stderr, "N = %d;\nisig = [", signal_size);
-    for(int i=0;i<signal_size;i++) fprintf(stderr, "%f ", iof(signal,i));
+    for(int i=0; i<signal_size; i++) fprintf(stderr, "%f ", iof(signal,i));
     fprintf(stderr, "];\nqsig = [");
-    for(int i=0;i<signal_size;i++) fprintf(stderr, "%f ", qof(signal,i));
+    for(int i=0; i<signal_size; i++) fprintf(stderr, "%f ", qof(signal,i));
     fprintf(stderr, "];\nzsig = [0:N-1];\nsubplot(2,2,[2 4]);\nplot3(isig,zsig,qsig,\"b-\",");
-    for(int i=0;i<points_size;i++)
-        fprintf(stderr, "[%f],[%d],[%f],\"%c.\"%c", 
-            iof(signal, points_z[i]), points_z[i], qof(signal, points_z[i]), 
-            (char)points_color[i]&0xff, (i<points_size-1)?',':' '
-        );
+    for(int i=0; i<points_size; i++)
+        fprintf(stderr, "[%f],[%d],[%f],\"%c.\"%c",
+                iof(signal, points_z[i]), points_z[i], qof(signal, points_z[i]),
+                (char)points_color[i]&0xff, (i<points_size-1)?',':' '
+               );
     va_end(vl);
     fprintf(stderr, ");\ntitle(\"index = %d, error = %f, cxoffs = %d\");\nsubplot(2,2,1);\nplot(zsig, isig,\"b-\",", index, error, correction_offset);
-    for(int i=0;i<points_size;i++)
-        fprintf(stderr, "[%d],[%f],\"%c.\"%c", 
-            points_z[i], iof(signal, points_z[i]),
-            (char)points_color[i]&0xff, (i<points_size-1)?',':' '
-        );
+    for(int i=0; i<points_size; i++)
+        fprintf(stderr, "[%d],[%f],\"%c.\"%c",
+                points_z[i], iof(signal, points_z[i]),
+                (char)points_color[i]&0xff, (i<points_size-1)?',':' '
+               );
     fprintf(stderr, ");\nsubplot(2,2,3);\nplot(zsig, qsig,\"b-\",");
-    for(int i=0;i<points_size;i++)
-        fprintf(stderr, "[%d],[%f],\"%c.\"%c", 
-            points_z[i], qof(signal, points_z[i]),
-            (char)points_color[i]&0xff, (i<points_size-1)?',':' '
-        );
+    for(int i=0; i<points_size; i++)
+        fprintf(stderr, "[%d],[%f],\"%c.\"%c",
+                points_z[i], qof(signal, points_z[i]),
+                (char)points_color[i]&0xff, (i<points_size-1)?',':' '
+               );
     fprintf(stderr, ");\n");
-    if(writefiles_path) fprintf(stderr, "print(cf, \"%s/%05d.png\", \"-S1024,1024\");\n", writefiles_path, figure_output_counter++); 
+    if(writefiles_path) fprintf(stderr, "print(cf, \"%s/%05d.png\", \"-S1024,1024\");\n", writefiles_path, figure_output_counter++);
     fflush(stderr);
     free(points_z);
     free(points_color);
@@ -1990,79 +1946,68 @@ void timing_recovery_cc(complexf* input, complexf* output, int input_size, float
     if(state->debug_every_nth>=0) fprintf(stderr, "disp(\"begin timing_recovery_cc\");\n");
     if(MTIMINGR_HDEBUG) fprintf(stderr, "timing_recovery_cc started, nsb = %d, nshb = %d, nsqb = %d\n", num_samples_bit, num_samples_halfbit, num_samples_quarterbit);
     {
-        for(;;)
-        {
+        for(;;) {
             //the MathWorks style algorithm has correction_offset.
-            //correction_offset = 0;            
+            //correction_offset = 0;
             if(current_bitstart_index + num_samples_halfbit * 3 >= input_size) break;
-            if(MTIMINGR_HDEBUG) fprintf(stderr, "current_bitstart_index = %d, input_size = %d, correction_offset(prev) = %d\n", 
-                    current_bitstart_index, input_size, correction_offset);
-            
-            if(correction_offset<=-num_samples_quarterbit*0.9 || correction_offset>=0.9*num_samples_quarterbit)
-            {
-                if(MTIMINGR_HDEBUG) fprintf(stderr, "correction_offset = %d, reset to 0!\n", correction_offset); 
+            if(MTIMINGR_HDEBUG) fprintf(stderr, "current_bitstart_index = %d, input_size = %d, correction_offset(prev) = %d\n",
+                                            current_bitstart_index, input_size, correction_offset);
+
+            if(correction_offset<=-num_samples_quarterbit*0.9 || correction_offset>=0.9*num_samples_quarterbit) {
+                if(MTIMINGR_HDEBUG) fprintf(stderr, "correction_offset = %d, reset to 0!\n", correction_offset);
                 correction_offset = 0;
             }
             //should check if the sign of the correction_offset (or disabling it) has an effect on the EVM.
             //it is also a possibility to disable multiplying with the magnitude
-            if(state->algorithm == TIMING_RECOVERY_ALGORITHM_EARLYLATE)
-            {
+            if(state->algorithm == TIMING_RECOVERY_ALGORITHM_EARLYLATE) {
                 //bitstart index should be at symbol edge, maximum effect point is at current_bitstart_index + num_samples_halfbit
                 el_point_right_index  = current_bitstart_index + num_samples_earlylate_wing * 3;
                 el_point_left_index   = current_bitstart_index + num_samples_earlylate_wing * 1 - correction_offset;
                 el_point_mid_index    = current_bitstart_index + num_samples_halfbit;
                 if(sampled_indexes) sampled_indexes[si]=el_point_mid_index;
                 output[si++] = input[el_point_mid_index];
-            }
-            else if(state->algorithm == TIMING_RECOVERY_ALGORITHM_GARDNER)
-            {
+            } else if(state->algorithm == TIMING_RECOVERY_ALGORITHM_GARDNER) {
                 //maximum effect point is at current_bitstart_index
                 el_point_right_index  = current_bitstart_index + num_samples_halfbit * 3;
                 el_point_left_index   = current_bitstart_index + num_samples_halfbit * 1;
                 el_point_mid_index    = current_bitstart_index + num_samples_halfbit * 2;
                 if(sampled_indexes) sampled_indexes[si]=el_point_left_index;
                 output[si++] = input[el_point_left_index];
-            }
-            else break;
+            } else break;
 
-            error = ( iof(input, el_point_right_index) - iof(input, el_point_left_index) ) * iof(input, el_point_mid_index); 
-            if(state->use_q)
-            {
-                error += ( qof(input, el_point_right_index) - qof(input, el_point_left_index)) * qof(input, el_point_mid_index); 
+            error = ( iof(input, el_point_right_index) - iof(input, el_point_left_index) ) * iof(input, el_point_mid_index);
+            if(state->use_q) {
+                error += ( qof(input, el_point_right_index) - qof(input, el_point_left_index)) * qof(input, el_point_mid_index);
                 error /= 2;
             }
             //Original correction method: this version can only move a single sample in any direction
             //current_bitstart_index += num_samples_halfbit * 2 + (error)?((error<0)?1:-1):0;
 
             if(timing_error) timing_error[si-1]=error; //it is not written if NULL
-            
+
             if(error>state->max_error) error=state->max_error;
             if(error<-state->max_error) error=-state->max_error;
-            if(state->debug_every_nth>=0)
-            {
-                if(state->debug_every_nth==0 || state->debug_phase==0) 
-                {
+            if(state->debug_every_nth>=0) {
+                if(state->debug_every_nth==0 || state->debug_phase==0) {
                     state->debug_phase = state->debug_every_nth;
-                    octave_plot_point_on_cplxsig(input+current_bitstart_index, state->decimation_rate*2, 
-                        error, 
-                        current_bitstart_index, 
-                        correction_offset,
-                        state->debug_writefiles_path,
-                        3,
-                        el_point_left_index - current_bitstart_index,  'r',
-                        el_point_right_index - current_bitstart_index, 'r',
-                        el_point_mid_index - current_bitstart_index,   'r',
-                        0);
-                }
-                else state->debug_phase--;
+                    octave_plot_point_on_cplxsig(input+current_bitstart_index, state->decimation_rate*2,
+                                                 error,
+                                                 current_bitstart_index,
+                                                 correction_offset,
+                                                 state->debug_writefiles_path,
+                                                 3,
+                                                 el_point_left_index - current_bitstart_index,  'r',
+                                                 el_point_right_index - current_bitstart_index, 'r',
+                                                 el_point_mid_index - current_bitstart_index,   'r',
+                                                 0);
+                } else state->debug_phase--;
             }
             int error_sign = (state->algorithm == TIMING_RECOVERY_ALGORITHM_GARDNER) ? -1 : 1;
             correction_offset = num_samples_halfbit * error_sign * error * state->loop_gain;
             current_bitstart_index += num_samples_bit + correction_offset;
-            if(si>=input_size) 
-            { 
-                if(MTIMINGR_HDEBUG) fprintf(stderr, "oops_out_of_si!\n"); 
-                break; 
+            if(si>=input_size) {
+                if(MTIMINGR_HDEBUG) fprintf(stderr, "oops_out_of_si!\n");
+                break;
             }
         }
     }
@@ -2093,6 +2038,7 @@ char* timing_recovery_get_string_from_algorithm(timing_recovery_algorithm_t algo
 
 void init_bpsk_costas_loop_cc(bpsk_costas_loop_state_t* s, int decision_directed, float damping_factor, float bandwidth)
 {
+    (void)decision_directed;
     //fprintf(stderr, "init_bpsk_costas_loop_cc: bandwidth = %f, damping_factor = %f\n", bandwidth, damping_factor);
     //based on: http://gnuradio.squarespace.com/blog/2011/8/13/control-loop-gain-values.html
     float bandwidth_omega = 2*PI*bandwidth; //so that the bandwidth should be around 0.01 by default (2pi/100), and the damping_factor should be default 0.707
@@ -2101,31 +2047,27 @@ void init_bpsk_costas_loop_cc(bpsk_costas_loop_state_t* s, int decision_directed
     s->alpha = (4*damping_factor*bandwidth_omega)/denomiator;
     s->beta = (4*bandwidth_omega*bandwidth_omega)/denomiator;
     s->current_freq = s->dphase = s->nco_phase = 0;
-    s->dphase_max=bandwidth_omega; //this has been determined by experiment: if dphase is out of [-dphase_max; dphase_max] it might actually hang and not come back 
+    s->dphase_max=bandwidth_omega; //this has been determined by experiment: if dphase is out of [-dphase_max; dphase_max] it might actually hang and not come back
     s->dphase_max_reset_to_zero=0;
 }
 
 void bpsk_costas_loop_cc(complexf* input, complexf* output, int input_size, float* output_error, float* output_dphase, complexf* output_nco, bpsk_costas_loop_state_t* s)
 {
-    for(int i=0;i<input_size;i++)
-    {
+    for(int i=0; i<input_size; i++) {
         complexf nco_sample;
         e_powj(&nco_sample, s->nco_phase);
         cmult(&output[i], &input[i], &nco_sample);
         if(output_nco) output_nco[i]=nco_sample;
         float error = 0;
-        if(s->decision_directed)
-        {
+        if(s->decision_directed) {
             float output_phase = atan2(qof(output,i),iof(output,i));
-            if (fabs(output_phase)<PI/2) 
+            if (fabs(output_phase)<PI/2)
                 error = -output_phase;
-            else
-            {
+            else {
                 error = PI-output_phase;
                 while(error>PI) error -= 2*PI;
             }
-        }
-        else error = PI*iof(output,i)*qof(output,i);
+        } else error = PI*iof(output,i)*qof(output,i);
         if(output_error) output_error[i]=error;
         s->current_freq += error * s->beta;
         s->dphase = error * s->alpha + s->current_freq;
@@ -2142,8 +2084,8 @@ void bpsk_costas_loop_cc(complexf* input, complexf* output, int input_size, floa
 }
 
 #if 0
-bpsk_costas_loop_state_t init_bpsk_costas_loop_cc(float samples_per_bits) 
-{ 
+bpsk_costas_loop_state_t init_bpsk_costas_loop_cc(float samples_per_bits)
+{
     bpsk_costas_loop_state_t state;
     state.vco_phase = 0;
     state.last_vco_phase_addition = 0;
@@ -2153,12 +2095,12 @@ bpsk_costas_loop_state_t init_bpsk_costas_loop_cc(float samples_per_bits)
     float rc_filter_cutoff = virtual_data_rate * 2; //this is so far the best
     float rc_filter_rc = 1/(2*M_PI*rc_filter_cutoff); //as of Equation 24 in Feigin
     float virtual_sampling_dt = 1.0/virtual_sampling_rate;
-    fprintf(stderr, "rc_filter_cutoff = %g, rc_filter_rc = %g, virtual_sampling_dt = %g\n", 
-        rc_filter_cutoff, rc_filter_rc, virtual_sampling_dt);
+    fprintf(stderr, "rc_filter_cutoff = %g, rc_filter_rc = %g, virtual_sampling_dt = %g\n",
+            rc_filter_cutoff, rc_filter_rc, virtual_sampling_dt);
     state.rc_filter_alpha = virtual_sampling_dt/(rc_filter_rc+virtual_sampling_dt); //https://en.wikipedia.org/wiki/Low-pass_filter
     float rc_filter_omega_cutoff = 2*M_PI*rc_filter_cutoff;
     state.vco_phase_addition_multiplier = 8*rc_filter_omega_cutoff / (virtual_sampling_rate); //as of Equation 25 in Feigin, assuming input signal amplitude of 1 (to 1V) and (state.vco_phase_addition_multiplier*<vco_input>), a value in radians, will be added to the vco_phase directly.
-    fprintf(stderr, "rc_filter_alpha = %g, rc_filter_omega_cutoff = %g, vco_phase_addition_multiplier = %g\n", 
+    fprintf(stderr, "rc_filter_alpha = %g, rc_filter_omega_cutoff = %g, vco_phase_addition_multiplier = %g\n",
             state.rc_filter_alpha, rc_filter_omega_cutoff, state.vco_phase_addition_multiplier);
     return state;
 }
@@ -2167,21 +2109,20 @@ void bpsk_costas_loop_c1mc(complexf* input, complexf* output, int input_size, bp
 {
     int debug = 0;
     if(debug) fprintf(stderr, "costas:\n");
-    for(int i=0;i<input_size;i++)
-    {
+    for(int i=0; i<input_size; i++) {
         float input_phase = atan2(input[i].q, input[i].i);
         float input_and_vco_mixed_phase = input_phase - state->vco_phase;
         if(debug) fprintf(stderr, "%g | %g\n", input_and_vco_mixed_phase, input_phase), debug--;
-        complexf input_and_vco_mixed_sample; 
+        complexf input_and_vco_mixed_sample;
         e_powj(&input_and_vco_mixed_sample, input_and_vco_mixed_phase);
-        
+
         complexf vco_sample;
         e_powj(&vco_sample, -state->vco_phase);
-        //cmult(&input_and_vco_mixed_sample, &input[i], &vco_sample);//if this is enabled, the real input sample is used, not the amplitude normalized 
+        //cmult(&input_and_vco_mixed_sample, &input[i], &vco_sample);//if this is enabled, the real input sample is used, not the amplitude normalized
 
-        float loop_output_i = 
+        float loop_output_i =
             input_and_vco_mixed_sample.i * state->rc_filter_alpha + state->last_lpfi_output * (1-state->rc_filter_alpha);
-        float loop_output_q = 
+        float loop_output_q =
             input_and_vco_mixed_sample.q * state->rc_filter_alpha + state->last_lpfq_output * (1-state->rc_filter_alpha);
         //loop_output_i = input_and_vco_mixed_sample.i;
         //loop_output_q = input_and_vco_mixed_sample.q;
@@ -2201,9 +2142,8 @@ void bpsk_costas_loop_c1mc(complexf* input, complexf* output, int input_size, bp
 void simple_agc_cc(complexf* input, complexf* output, int input_size, float rate, float reference, float max_gain, float* current_gain)
 {
     float rate_1minus=1-rate;
-    int debugn = 0;
-    for(int i=0;i<input_size;i++)
-    {
+    //int debugn = 0;
+    for(int i=0; i<input_size; i++) {
         float amplitude = sqrt(input[i].i*input[i].i+input[i].q*input[i].q);
         float ideal_gain = (reference/amplitude);
         if(ideal_gain>max_gain) ideal_gain = max_gain;
@@ -2224,8 +2164,7 @@ void firdes_add_peak_c(complexf* output, int length, float rate, window_t window
     int middle=length/2;
     float phase = 0, phase_addition = -rate*M_PI*2;
     float (*window_function)(float) = firdes_get_window_kernel(window);
-    for(int i=0; i<length; i++) //@@firdes_add_peak_c: calculate taps
-    {
+    for(int i=0; i<length; i++) { //@@firdes_add_peak_c: calculate taps
         e_powj(&taps[i], phase);
         float window_multiplier = window_function(fabs((float)(middle-i)/middle));
         taps[i].i *= window_multiplier;
@@ -2236,22 +2175,17 @@ void firdes_add_peak_c(complexf* output, int length, float rate, window_t window
     }
 
     //Normalize filter kernel
-    if(add) 
-        for(int i=0;i<length;i++)
-        {
+    if(add)
+        for(int i=0; i<length; i++) {
             output[i].i += taps[i].i;
             output[i].q += taps[i].q;
-        }
-    else for(int i=0;i<length;i++) output[i] = taps[i];
-    if(normalize)
-    {
+        } else for(int i=0; i<length; i++) output[i] = taps[i];
+    if(normalize) {
         float sum=0;
-        for(int i=0;i<length;i++) //@firdes_add_peak_c: normalize pass 1
-        {
+        for(int i=0; i<length; i++) { //@firdes_add_peak_c: normalize pass 1
             sum+=sqrt(output[i].i*output[i].i + output[i].q*output[i].q);
         }
-        for(int i=0;i<length;i++) //@firdes_add_peak_c: normalize pass 2
-        {
+        for(int i=0; i<length; i++) { //@firdes_add_peak_c: normalize pass 2
             output[i].i/=sum;
             output[i].q/=sum;
         }
@@ -2261,11 +2195,9 @@ void firdes_add_peak_c(complexf* output, int length, float rate, window_t window
 int apply_fir_cc(complexf* input, complexf* output, int input_size, complexf* taps, int taps_length)
 {
     int i;
-    for(i=0; i<input_size-taps_length+1; i++)
-    {
+    for(i=0; i<input_size-taps_length+1; i++) {
         csetnull(&output[i]);
-        for(int ti=0;ti<taps_length;ti++)
-        {
+        for(int ti=0; ti<taps_length; ti++) {
             cmultadd(&output[i], &input[i+ti], &taps[ti]);
         }
     }
@@ -2276,11 +2208,9 @@ int apply_fir_cc(complexf* input, complexf* output, int input_size, complexf* ta
 int apply_real_fir_cc(complexf* input, complexf* output, int input_size, float* taps, int taps_length)
 {
     int i;
-    for(i=0; i<input_size-taps_length+1; i++)
-    {
+    for(i=0; i<input_size-taps_length+1; i++) {
         float acci = 0, accq = 0;
-        for(int ti=0;ti<taps_length;ti++)
-        {
+        for(int ti=0; ti<taps_length; ti++) {
             acci += iof(input,i+ti)*taps[ti];
             accq += qof(input,i+ti)*taps[ti];
         }
@@ -2290,18 +2220,17 @@ int apply_real_fir_cc(complexf* input, complexf* output, int input_size, float* 
     return i;
 }
 
-float normalized_timing_variance_u32_f(unsigned* input, float* temp, int input_size, int samples_per_symbol, int initial_sample_offset, int debug_print)
+float normalized_timing_variance_u32_f(unsigned* input, float* temp, int input_size, unsigned int samples_per_symbol, int initial_sample_offset, int debug_print)
 {
     float *ndiff_rad = temp;
     float ndiff_rad_mean = 0;
-    for(int i=0;i<input_size;i++) 
-    {
+    for(int i=0; i<input_size; i++) {
         //find out which real sample index this input sample index is the nearest to.
         unsigned sinearest = (input[i]-initial_sample_offset) / samples_per_symbol;
         unsigned sinearest_remain = (input[i]-initial_sample_offset) % samples_per_symbol;
         if(sinearest_remain>samples_per_symbol/2) sinearest++;
         unsigned socorrect = initial_sample_offset+(sinearest*samples_per_symbol); //the sample offset which input[i] should have been, in order to sample at the maximum effect point
-        int sodiff = abs(socorrect-input[i]);
+        int sodiff = socorrect-input[i];
         float ndiff = (float)sodiff/samples_per_symbol;
 
         ndiff_rad[i] = ndiff*PI;
@@ -2311,7 +2240,7 @@ float normalized_timing_variance_u32_f(unsigned* input, float* temp, int input_s
     fprintf(stderr, "ndiff_rad_mean = %f\n", ndiff_rad_mean);
 
     float result = 0;
-    for(int i=0;i<input_size;i++) result+=(powf(ndiff_rad[i]-ndiff_rad_mean,2))/(input_size-1);
+    for(int i=0; i<input_size; i++) result+=(powf(ndiff_rad[i]-ndiff_rad_mean,2))/(input_size-1);
     //fprintf(stderr, "nv = %f\n", result);
     return result;
 }
@@ -2319,8 +2248,7 @@ float normalized_timing_variance_u32_f(unsigned* input, float* temp, int input_s
 void dbpsk_decoder_c_u8(complexf* input, unsigned char* output, int input_size)
 {
     static complexf last_input;
-    for(int i=0;i<input_size;i++)
-    {
+    for(int i=0; i<input_size; i++) {
         float phase = atan2(qof(input,i), iof(input,i));
         float last_phase = atan2(qofv(last_input), iofv(last_input));
         float dphase = phase-last_phase;
@@ -2335,17 +2263,15 @@ void dbpsk_decoder_c_u8(complexf* input, unsigned char* output, int input_size)
 int bfsk_demod_cf(complexf* input, float* output, int input_size, complexf* mark_filter, complexf* space_filter, int taps_length)
 {
     complexf acc_space, acc_mark;
-    for(int i=0; i<input_size-taps_length+1; i++)
-    {
+    for(int i=0; i<input_size-taps_length+1; i++) {
         csetnull(&acc_space);
         csetnull(&acc_mark);
-        for(int ti=0;ti<taps_length;ti++)
-        {
+        for(int ti=0; ti<taps_length; ti++) {
             cmultadd(&acc_space, &input[i+ti], &space_filter[ti]);
             cmultadd(&acc_mark,  &input[i+ti], &mark_filter[ti]);
         }
         output[i] = - ( iofv(acc_space)*iofv(acc_space)+qofv(acc_space)*qofv(acc_space) ) +
-            ( iofv(acc_mark)*iofv(acc_mark)+qofv(acc_mark)*qofv(acc_mark) );
+                    ( iofv(acc_mark)*iofv(acc_mark)+qofv(acc_mark)*qofv(acc_mark) );
     }
     return input_size-taps_length+1;
 }
@@ -2362,29 +2288,29 @@ int bfsk_demod_cf(complexf* input, float* output, int input_size, complexf* mark
 
 void convert_u8_f(unsigned char* input, float* output, int input_size)
 {
-    for(int i=0;i<input_size;i++) output[i]=((float)input[i])/(UCHAR_MAX/2.0)-1.0; //@convert_u8_f
+    for(int i=0; i<input_size; i++) output[i]=((float)input[i])/(UCHAR_MAX/2.0)-1.0; //@convert_u8_f
 }
 
 void convert_s8_f(signed char* input, float* output, int input_size)
 {
-    for(int i=0;i<input_size;i++) output[i]=((float)input[i])/SCHAR_MAX; //@convert_s8_f
+    for(int i=0; i<input_size; i++) output[i]=((float)input[i])/SCHAR_MAX; //@convert_s8_f
 }
 
 void convert_s16_f(short* input, float* output, int input_size)
 {
-    for(int i=0;i<input_size;i++) output[i]=(float)input[i]/SHRT_MAX; //@convert_s16_f
+    for(int i=0; i<input_size; i++) output[i]=(float)input[i]/SHRT_MAX; //@convert_s16_f
 }
 
 void convert_f_u8(float* input, unsigned char* output, int input_size)
 {
-    for(int i=0;i<input_size;i++) output[i]=input[i]*UCHAR_MAX*0.5+128; //@convert_f_u8
+    for(int i=0; i<input_size; i++) output[i]=input[i]*UCHAR_MAX*0.5+128; //@convert_f_u8
     //128 above is the correct value to add. In any other case a DC component
     //of at least -60 dB is shown on the FFT plot after convert_f_u8 -> convert_u8_f
 }
 
 void convert_f_s8(float* input, signed char* output, int input_size)
 {
-    for(int i=0;i<input_size;i++) output[i]=input[i]*SCHAR_MAX; //@convert_f_s8
+    for(int i=0; i<input_size; i++) output[i]=input[i]*SCHAR_MAX; //@convert_f_s8
 }
 
 void convert_f_s16(float* input, short* output, int input_size)
@@ -2394,46 +2320,46 @@ void convert_f_s16(float* input, short* output, int input_size)
         if(input[i]>1.0) input[i]=1.0;
         if(input[i]<-1.0) input[i]=-1.0;
     }*/
-    for(int i=0;i<input_size;i++) output[i]=input[i]*SHRT_MAX; //@convert_f_s16
+    for(int i=0; i<input_size; i++) output[i]=input[i]*SHRT_MAX; //@convert_f_s16
 }
 
-void convert_i16_f(short* input, float* output, int input_size) { convert_s16_f(input, output, input_size); }
-void convert_f_i16(float* input, short* output, int input_size) { convert_f_s16(input, output, input_size); }
+void convert_i16_f(short* input, float* output, int input_size)
+{
+    convert_s16_f(input, output, input_size);
+}
+void convert_f_i16(float* input, short* output, int input_size)
+{
+    convert_f_s16(input, output, input_size);
+}
 
 void convert_f_s24(float* input, unsigned char* output, int input_size, int bigendian)
 {
     int k=0;
-    if(bigendian) for(int i=0;i<input_size;i++)
-    {
-        int temp=input[i]*(INT_MAX>>8);
-        unsigned char* ptemp=(unsigned char*)&temp;
-        output[k++]=*ptemp;
-        output[k++]=*(ptemp+1);
-        output[k++]=*(ptemp+2);
-    }
-    else for(int i=0;i<input_size;i++)
-    {
-        int temp=input[i]*(INT_MAX>>8);
-        unsigned char* ptemp=(unsigned char*)&temp;
-        output[k++]=*(ptemp+2);
-        output[k++]=*(ptemp+1);
-        output[k++]=*ptemp;
-    }
+    if(bigendian) for(int i=0; i<input_size; i++) {
+            int temp=input[i]*(INT_MAX>>8);
+            unsigned char* ptemp=(unsigned char*)&temp;
+            output[k++]=*ptemp;
+            output[k++]=*(ptemp+1);
+            output[k++]=*(ptemp+2);
+        } else for(int i=0; i<input_size; i++) {
+            int temp=input[i]*(INT_MAX>>8);
+            unsigned char* ptemp=(unsigned char*)&temp;
+            output[k++]=*(ptemp+2);
+            output[k++]=*(ptemp+1);
+            output[k++]=*ptemp;
+        }
 }
 
 void convert_s24_f(unsigned char* input, float* output, int input_size, int bigendian)
 {
     int k=0;
-    if(bigendian) for(int i=0;i<input_size*3;i+=3)
-    {
-        int temp=(input[i+2]<<24)|(input[i+1]<<16)|(input[i]<<8);
-        output[k++]=temp/(float)(INT_MAX-256);
-    }
-    else for(int i=0;i<input_size*3;i+=3)
-    {
-        int temp=(input[i+2]<<8)|(input[i+1]<<16)|(input[i]<<24);
-        output[k++]=temp/(float)(INT_MAX-256);
-    }
+    if(bigendian) for(int i=0; i<input_size*3; i+=3) {
+            int temp=(input[i+2]<<24)|(input[i+1]<<16)|(input[i]<<8);
+            output[k++]=temp/(float)(INT_MAX-256);
+        } else for(int i=0; i<input_size*3; i+=3) {
+            int temp=(input[i+2]<<8)|(input[i+1]<<16)|(input[i]<<24);
+            output[k++]=temp/(float)(INT_MAX-256);
+        }
 }
 
 FILE* init_get_random_samples_f()
@@ -2445,8 +2371,7 @@ void get_random_samples_f(float* output, int output_size, FILE* status)
 {
     int* pioutput = (int*)output;
     fread((unsigned char*)output, sizeof(float), output_size, status);
-    for(int i=0;i<output_size;i++)
-    {
+    for(int i=0; i<output_size; i++) {
         float tempi = pioutput[i];
         output[i] = tempi/((float)(INT_MAX)); //*0.82
     }
@@ -2456,8 +2381,7 @@ void get_random_gaussian_samples_c(complexf* output, int output_size, FILE* stat
 {
     int* pioutput = (int*)output;
     fread((unsigned char*)output, sizeof(complexf), output_size, status);
-    for(int i=0;i<output_size;i++)
-    {
+    for(int i=0; i<output_size; i++) {
         float u1 = 0.5+0.49999999*(((float)pioutput[2*i])/(float)INT_MAX);
         float u2 = 0.5+0.49999999*(((float)pioutput[2*i+1])/(float)INT_MAX);
         iof(output, i)=sqrt(-2*log(u1))*cos(2*PI*u2);
@@ -2470,36 +2394,34 @@ int deinit_get_random_samples_f(FILE* status)
     return fclose(status);
 }
 
-int firdes_cosine_f(float* taps, int taps_length, int samples_per_symbol)
+void firdes_cosine_f(float* taps, int taps_length, int samples_per_symbol)
 {
     //needs a taps_length 2 × samples_per_symbol + 1
     int middle_i=taps_length/2;
-    for(int i=0;i<samples_per_symbol;i++) taps[middle_i+i]=taps[middle_i-i]=(1+cos(PI*i/(float)samples_per_symbol))/2;
+    for(int i=0; i<samples_per_symbol; i++) taps[middle_i+i]=taps[middle_i-i]=(1+cos(PI*i/(float)samples_per_symbol))/2;
     //for(int i=0;i<taps_length;i++) taps[i]=powf(taps[i],2);
     normalize_fir_f(taps, taps, taps_length);
 }
 
-int firdes_rrc_f(float* taps, int taps_length, int samples_per_symbol, float beta)
+void firdes_rrc_f(float* taps, int taps_length, int samples_per_symbol, float beta)
 {
     //needs an odd taps_length
     int middle_i=taps_length/2;
     taps[middle_i]=(1/(float)samples_per_symbol)*(1+beta*(4/PI-1));
-    for(int i=1;i<1+taps_length/2;i++) 
-    {
-        if(i==samples_per_symbol/(4*beta)) 
+    for(int i=1; i<1+taps_length/2; i++) {
+        if(i==samples_per_symbol/(4*beta))
             taps[middle_i+i]=taps[middle_i-i]=(beta/(samples_per_symbol*sqrt(2)))*((1+(2/PI))*sin(PI/(4*beta))+(1-(2/PI))*cos(PI/(4*beta)));
         else
             taps[middle_i+i]=taps[middle_i-i]=(1/(float)samples_per_symbol)*
-                (sin(PI*(i/(float)samples_per_symbol)*(1-beta)) + 4*beta*(i/(float)samples_per_symbol)*cos(PI*(i/(float)samples_per_symbol)*(1+beta)))/
-                (PI*(i/(float)samples_per_symbol)*(1-powf(4*beta*(i/(float)samples_per_symbol),2)));
+                                              (sin(PI*(i/(float)samples_per_symbol)*(1-beta)) + 4*beta*(i/(float)samples_per_symbol)*cos(PI*(i/(float)samples_per_symbol)*(1+beta)))/
+                                              (PI*(i/(float)samples_per_symbol)*(1-powf(4*beta*(i/(float)samples_per_symbol),2)));
     }
     normalize_fir_f(taps, taps, taps_length);
 }
 
 void plain_interpolate_cc(complexf* input, complexf* output, int input_size, int interpolation)
 {
-    for(int i=0;i<input_size;i++)
-    {
+    for(int i=0; i<input_size; i++) {
         output[i*interpolation]=input[i];
         bzero(output+(interpolation*i)+1, (interpolation-1)*sizeof(complexf));
     }
@@ -2515,15 +2437,14 @@ matched_filter_type_t matched_filter_get_type_from_string(char* input)
     return MATCHED_FILTER_DEFAULT;
 }
 
-float* add_ff(float* input1, float* input2, float* output, int input_size)
+void add_ff(float* input1, float* input2, float* output, int input_size)
 {
-    for(int i=0;i<input_size;i++) output[i]=input1[i]+input2[i];
+    for(int i=0; i<input_size; i++) output[i]=input1[i]+input2[i];
 }
 
-float* add_const_cc(complexf* input, complexf* output, int input_size, complexf x)
+void add_const_cc(complexf* input, complexf* output, int input_size, complexf x)
 {
-    for(int i=0;i<input_size;i++)
-    {
+    for(int i=0; i<input_size; i++) {
         iof(output,i)=iof(input,i)+iofv(x);
         qof(output,i)=iof(input,i)+qofv(x);
     }
@@ -2532,9 +2453,8 @@ float* add_const_cc(complexf* input, complexf* output, int input_size, complexf 
 int trivial_vectorize()
 {
     //this function is trivial to vectorize and should pass on both NEON and SSE
-    int a[1024], b[1024], c[1024];
-    for(int i=0; i<1024; i++) //@trivial_vectorize: should pass :-)
-    {
+    int a[1024] = {}, b[1024] = {}, c[1024] = {};
+    for(int i=0; i<1024; i++) { //@trivial_vectorize: should pass :-)
         c[i]=a[i]*b[i];
     }
     return c[0];

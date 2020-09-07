@@ -19,15 +19,18 @@ This file is part of libcsdr.
     along with libcsdr.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#pragma once
-
 #ifdef LIBCSDR_GPL
 
-typedef struct shift_addition_data_s
-{
-	float sindelta;
-	float cosdelta;
-	float rate;
+#pragma once
+
+#ifdef __MINGW32__
+#include "libcsdr.h"
+#endif
+
+typedef struct shift_addition_data_s {
+    float sindelta;
+    float cosdelta;
+    float rate;
 } shift_addition_data_t;
 shift_addition_data_t shift_addition_init(float rate);
 float shift_addition_cc(complexf *input, complexf* output, int input_size, shift_addition_data_t d, float starting_phase);
@@ -36,11 +39,10 @@ void shift_addition_cc_test(shift_addition_data_t d);
 
 float agc_ff(float* input, float* output, int input_size, float reference, float attack_rate, float decay_rate, float max_gain, short hang_time, short attack_wait_time, float gain_filter_alpha, float last_gain);
 
-typedef struct decimating_shift_addition_status_s
-{
-	int decimation_remain;
-	float starting_phase;
-	int output_size;
+typedef struct decimating_shift_addition_status_s {
+    int decimation_remain;
+    float starting_phase;
+    int output_size;
 } decimating_shift_addition_status_t;
 decimating_shift_addition_status_t decimating_shift_addition_cc(complexf *input, complexf* output, int input_size, shift_addition_data_t d, int decimation, decimating_shift_addition_status_t s);
 shift_addition_data_t decimating_shift_addition_init(float rate, int decimation);

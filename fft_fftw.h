@@ -11,12 +11,11 @@
 #define fft_malloc fftwf_malloc
 #define fft_free fftwf_free
 
-struct fft_plan_s 
-{
-	int size;
-	void* input;
-	void* output;
-	fftwf_plan plan;
+struct fft_plan_s {
+    int size;
+    void* input;
+    void* output;
+    fftwf_plan plan;
 };
 
 #include "libcsdr.h"

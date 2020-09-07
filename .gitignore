@@ -8,3 +8,9 @@ tags
 dumpvect.*.vect
 *.swp
 grc_tests/top_block.py
+*.exe
+*.dll
+mingw/*.depend
+mingw/*.layout
+mingw/include/*
+mingw/lib/*

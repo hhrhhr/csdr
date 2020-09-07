@@ -29,6 +29,17 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 #pragma once
+
+#ifdef __MINGW32__
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+#include <assert.h>
+#include <stdarg.h>
+
+#define bzero(b,len) (memset((b), '\0', (len)), (void) 0)
+#endif
+
 #define MIN_M(x,y) (((x)>(y))?(y):(x))
 #define MAX_M(x,y) (((x)<(y))?(y):(x))
 
@@ -43,7 +54,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
                        |_|
 */
 
-typedef struct complexf_s { float i; float q; } complexf;
+typedef struct complexf_s {
+    float i;
+    float q;
+} complexf;
 
 //apply to pointers:
 #define iof(complexf_input_p,i) (*(((float*)complexf_input_p)+2*(i)))
@@ -67,8 +81,7 @@ typedef struct complexf_s { float i; float q; } complexf;
 #define TIME_TAKEN(start,end) ((end.tv_sec-start.tv_sec)+(end.tv_nsec-start.tv_nsec)/1e9)
 
 //window
-typedef enum window_s
-{
+typedef enum window_s {
     WINDOW_BOXCAR, WINDOW_BLACKMAN, WINDOW_HAMMING
 } window_t;
 
@@ -107,16 +120,14 @@ int deemphasis_nfm_ff (float* input, float* output, int input_size, int sample_r
 float deemphasis_wfm_ff (float* input, float* output, int input_size, float tau, int sample_rate, float last_output);
 float shift_math_cc(complexf *input, complexf* output, int input_size, float rate, float starting_phase);
 
-typedef struct dcblock_preserve_s
-{
+typedef struct dcblock_preserve_s {
     float last_input;
     float last_output;
 } dcblock_preserve_t;
 dcblock_preserve_t dcblock_ff(float* input, float* output, int input_size, float a, dcblock_preserve_t preserved);
 float fastdcblock_ff(float* input, float* output, int input_size, float last_dc_level);
 
-typedef struct fastagc_ff_s
-{
+typedef struct fastagc_ff_s {
     float* buffer_1;
     float* buffer_2;
     float* buffer_input; //it is the actual input buffer to fill
@@ -129,8 +140,7 @@ typedef struct fastagc_ff_s
 
 void fastagc_ff(fastagc_ff_t* input, float* output);
 
-typedef struct rational_resampler_ff_s
-{
+typedef struct rational_resampler_ff_s {
     int input_processed;
     int output_size;
     int last_taps_delay;
@@ -148,8 +158,7 @@ void logpower_cf(complexf* input, float* output, int size, float add_db);
 void accumulate_power_cf(complexf* input, float* output, int size);
 void log_ff(float* input, float* output, int size, float add_db);
 
-typedef struct fractional_decimator_ff_s
-{
+typedef struct fractional_decimator_ff_s {
     float where;
     int input_processed;
     int output_size;
@@ -157,11 +166,11 @@ typedef struct fractional_decimator_ff_s
     float* poly_precalc_denomiator; //while we don't precalculate coefficients here as in a Farrow structure, because it is a fractional interpolator, but we rather precaculate part of the interpolator expression
     //float* last_inputs_circbuf; //circular buffer to store the last (num_poly_points) number of input samples.
     //int last_inputs_startsat; //where the circular buffer starts now
-    //int last_inputs_samplewhere; 
+    //int last_inputs_samplewhere;
     float* coeffs_buf;
     float* filtered_buf;
-    int xifirst; 
-    int xilast; 
+    int xifirst;
+    int xilast;
     float rate;
     float *taps;
     int taps_length;
@@ -169,16 +178,14 @@ typedef struct fractional_decimator_ff_s
 fractional_decimator_ff_t fractional_decimator_ff_init(float rate, int num_poly_points, float* taps, int taps_length);
 void fractional_decimator_ff(float* input, float* output, int input_size, fractional_decimator_ff_t* d);
 
-typedef struct old_fractional_decimator_ff_s
-{
+typedef struct old_fractional_decimator_ff_s {
     float remain;
     int input_processed;
     int output_size;
 } old_fractional_decimator_ff_t;
 old_fractional_decimator_ff_t old_fractional_decimator_ff(float* input, float* output, int input_size, float rate, float *taps, int taps_length, old_fractional_decimator_ff_t d);
 
-typedef struct shift_table_data_s
-{
+typedef struct shift_table_data_s {
     float* table;
     int table_size;
 } shift_table_data_t;
@@ -186,8 +193,7 @@ void shift_table_deinit(shift_table_data_t table_data);
 shift_table_data_t shift_table_init(int table_size);
 float shift_table_cc(complexf* input, complexf* output, int input_size, float rate, shift_table_data_t table_data, float starting_phase);
 
-typedef struct shift_addfast_data_s
-{
+typedef struct shift_addfast_data_s {
     float dsin[4];
     float dcos[4];
     float phase_increment;
@@ -196,8 +202,7 @@ shift_addfast_data_t shift_addfast_init(float rate);
 shift_addfast_data_t shift_addfast_init(float rate);
 float shift_addfast_cc(complexf *input, complexf* output, int input_size, shift_addfast_data_t* d, float starting_phase);
 
-typedef struct shift_unroll_data_s
-{
+typedef struct shift_unroll_data_s {
     float* dsin;
     float* dcos;
     float phase_increment;
@@ -233,22 +238,19 @@ int is_nan(float f);
 
 //digital demod
 
-typedef struct rtty_baudot_item_s
-{
+typedef struct rtty_baudot_item_s {
     unsigned long long code;
     unsigned char ascii_letter;
     unsigned char ascii_figure;
 } rtty_baudot_item_t;
 
-typedef enum rtty_baudot_decoder_state_e
-{
+typedef enum rtty_baudot_decoder_state_e {
     RTTY_BAUDOT_WAITING_STOP_PULSE = 0,
     RTTY_BAUDOT_WAITING_START_PULSE,
     RTTY_BAUDOT_RECEIVING_DATA
 } rtty_baudot_decoder_state_t;
 
-typedef struct rtty_baudot_decoder_s
-{
+typedef struct rtty_baudot_decoder_s {
     unsigned char fig_mode;
     unsigned char character_received;
     unsigned short shr;
@@ -264,8 +266,7 @@ char rtty_baudot_decoder_push(rtty_baudot_decoder_t* s, unsigned char symbol);
 
 //PSK31
 
-typedef struct psk31_varicode_item_s
-{
+typedef struct psk31_varicode_item_s {
     unsigned long long code;
     int bitcount;
     unsigned char ascii;
@@ -275,8 +276,7 @@ char psk31_varicode_decoder_push(unsigned long long* status_shr, unsigned char s
 
 //Serial
 
-typedef struct serial_line_s
-{
+typedef struct serial_line_s {
     float samples_per_bits;
     int databits; //including parity
     float stopbits;
@@ -289,14 +289,12 @@ void serial_line_decoder_f_u8(serial_line_t* s, float* input, unsigned char* out
 void binary_slicer_f_u8(float* input, unsigned char* output, int input_size);
 
 
-typedef enum pll_type_e
-{
+typedef enum pll_type_e {
     PLL_P_CONTROLLER=1,
     PLL_PI_CONTROLLER=2
 } pll_type_t;
 
-typedef struct pll_s
-{
+typedef struct pll_s {
     pll_type_t pll_type;
     //common:
     float output_phase;
@@ -311,18 +309,16 @@ void pll_cc_init_pi_controller(pll_t* p, float bandwidth, float ko, float kd, fl
 void pll_cc_init_p_controller(pll_t* p, float alpha);
 void pll_cc(pll_t* p, complexf* input, float* output_dphase, complexf* output_nco, int input_size);
 
-typedef enum timing_recovery_algorithm_e
-{
-    TIMING_RECOVERY_ALGORITHM_GARDNER, 
-    TIMING_RECOVERY_ALGORITHM_EARLYLATE 
+typedef enum timing_recovery_algorithm_e {
+    TIMING_RECOVERY_ALGORITHM_GARDNER,
+    TIMING_RECOVERY_ALGORITHM_EARLYLATE
 } timing_recovery_algorithm_t;
 
 #define TIMING_RECOVERY_ALGORITHM_DEFAULT TIMING_RECOVERY_ALGORITHM_GARDNER
 
-typedef struct timing_recovery_state_s
-{
+typedef struct timing_recovery_state_s {
     timing_recovery_algorithm_t algorithm;
-    int decimation_rate; // = input_rate / output_rate. We should get an input signal that is N times oversampled. 
+    int decimation_rate; // = input_rate / output_rate. We should get an input signal that is N times oversampled.
     int output_size;
     int input_processed;
     int use_q; //use both I and Q for calculating the error
@@ -347,8 +343,7 @@ void psk31_varicode_encoder_u8_u8(unsigned char* input, unsigned char* output, i
 unsigned char differential_codec(unsigned char* input, unsigned char* output, int input_size, int encode, unsigned char state);
 
 #if 0
-typedef struct bpsk_costas_loop_state_s
-{
+typedef struct bpsk_costas_loop_state_s {
     float rc_filter_alpha;
     float vco_phase_addition_multiplier;
     float vco_phase;
@@ -359,10 +354,9 @@ typedef struct bpsk_costas_loop_state_s
 
 bpsk_costas_loop_state_t init_bpsk_costas_loop_cc(float samples_per_bits);
 void bpsk_costas_loop_cc(complexf* input, complexf* output, int input_size, bpsk_costas_loop_state_t* state);
-#endif 
+#endif
 
-typedef struct bpsk_costas_loop_state_s
-{
+typedef struct bpsk_costas_loop_state_s {
     float alpha;
     float beta;
     int decision_directed;
@@ -386,26 +380,25 @@ FILE* init_get_random_samples_f();
 void get_random_samples_f(float* output, int output_size, FILE* status);
 void get_random_gaussian_samples_c(complexf* output, int output_size, FILE* status);
 int deinit_get_random_samples_f(FILE* status);
-float* add_ff(float* input1, float* input2, float* output, int input_size);
+void add_ff(float* input1, float* input2, float* output, int input_size);
 float total_logpower_cf(complexf* input, int input_size);
-float normalized_timing_variance_u32_f(unsigned* input, float* temp, int input_size, int samples_per_symbol, int initial_sample_offset, int debug_print);
+float normalized_timing_variance_u32_f(unsigned* input, float* temp, int input_size, unsigned int samples_per_symbol, int initial_sample_offset, int debug_print);
 
-typedef enum matched_filter_type_e
-{
-    MATCHED_FILTER_RRC, 
-    MATCHED_FILTER_COSINE 
+typedef enum matched_filter_type_e {
+    MATCHED_FILTER_RRC,
+    MATCHED_FILTER_COSINE
 } matched_filter_type_t;
 
 #define MATCHED_FILTER_DEFAULT MATCHED_FILTER_RRC
 
-int firdes_cosine_f(float* taps, int taps_length, int samples_per_symbol);
-int firdes_rrc_f(float* taps, int taps_length, int samples_per_symbol, float beta);
+void firdes_cosine_f(float* taps, int taps_length, int samples_per_symbol);
+void firdes_rrc_f(float* taps, int taps_length, int samples_per_symbol, float beta);
 matched_filter_type_t matched_filter_get_type_from_string(char* input);
 int apply_real_fir_cc(complexf* input, complexf* output, int input_size, float* taps, int taps_length);
 void generic_slicer_f_u8(float* input, unsigned char* output, int input_size, int n_symbols);
 void plain_interpolate_cc(complexf* input, complexf* output, int input_size, int interpolation);;
 void normalize_fir_f(float* input, float* output, int length);
-float* add_const_cc(complexf* input, complexf* output, int input_size, complexf x);
+void add_const_cc(complexf* input, complexf* output, int input_size, complexf x);
 void pack_bits_1to8_u8_u8(unsigned char* input, unsigned char* output, int input_size);
 unsigned char pack_bits_8to1_u8_u8(unsigned char* input);
 void dbpsk_decoder_c_u8(complexf* input, unsigned char* output, int input_size);
